@@ -1,3 +1,5 @@
+source ~/powerlevel10k/powerlevel10k.zsh-theme
+
 ### Auto Install ###
 ### Added by Zinit's installer
 if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
@@ -21,7 +23,6 @@ zinit light-mode for \
     zdharma-continuum/zinit-annex-rust
 
 ### End of Zinit's installer chunk
-source ~/powerlevel10k/powerlevel10k.zsh-theme
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -74,24 +75,24 @@ zinit ice wait'0';zinit light zdharma/history-search-multi-word
 
 # alias
 alias ll="ls -la --color=auto"
-alias v="nvim"
+alias nv="nvim"
+alias dc="docker compose"
 
-#THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
-export SDKMAN_DIR="$HOME/.sdkman"
-[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
-
-# pnpm
+# PATH settings
 export PNPM_HOME="/Users/kenta/Library/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
-# pnpm end
-
-# npm
 export PATH=~/.npm-global/bin:$PATH
+export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="/opt/homebrew/opt/curl/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+
+# load .zshrc.local
+if [[ -f ~/.zshrc.local ]]; then
+    source ~/.zshrc.local
+fi
 
 # Set working dir
 cd ~
-
-
