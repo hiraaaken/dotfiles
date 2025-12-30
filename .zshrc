@@ -74,7 +74,7 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=244"
 zinit ice wait'0';zinit light zdharma/history-search-multi-word
 
 # alias
-alias ll="ls -la --color=auto"
+alias ll="eza --icons -al --group-directories-first"
 alias nv="nvim"
 alias dc="docker compose"
 
@@ -88,6 +88,9 @@ export PATH=~/.npm-global/bin:$PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="/opt/homebrew/opt/curl/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
+
+# fnm settings
+eval "$(fnm env --use-on-cd)"
 
 # load .zshrc.local
 if [[ -f ~/.zshrc.local ]]; then
