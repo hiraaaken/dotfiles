@@ -99,3 +99,5 @@ fi
 
 # Set working dir
 cd ~
+
+[ -f "/Users/kenta/.ghcup/env" ] && . "/Users/kenta/.ghcup/env" # ghcup-env

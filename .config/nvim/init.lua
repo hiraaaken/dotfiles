@@ -1,6 +1,4 @@
--- 各ファイルのインポート
-require("hiraaaken.core")
-
--- vim 基本設定
-vim.opt.number = true
-vim.opt.cursorline = true
+require("core.options")
+require("core.keymaps")
+require("config.lazy")
+require("config.lsp")

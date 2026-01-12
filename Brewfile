@@ -17,6 +17,7 @@ brew "gradle"
 brew "uv"
 brew "fnm"
 brew "bat"
+brew "tree-sitter"
 
 # Neovim IME support
 tap "daipeihust/tap"

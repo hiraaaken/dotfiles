@@ -5,15 +5,21 @@ local opt = vim.opt
 opt.relativenumber = true
 opt.number = true
 
--- タブ・インデント設定
-opt.tabstop = 2
-opt.shiftwidth = 2
+-- tab/index settings
 opt.expandtab = true
+opt.shiftround = true
+opt.shiftwidth = 2
+opt.softtabstop = 2
 opt.autoindent = true
+opt.tabstop = 2
+
+opt.scrolloff = 3
+
+opt.whichwrap = 'bshl<>[]~'
 
 opt.wrap = false
 
--- 検索設定
+-- search settings
 opt.ignorecase = true
 opt.smartcase = true
 
@@ -25,8 +31,9 @@ opt.signcolumn = "yes"
 
 opt.backspace = "indent,eol,start"
 
-opt.clipboard:append("unnamedplus")
+-- share clipboard with OS 
+opt.clipboard:append("unnamedplus,unnamed")
 
--- 画面分割
+-- split windows
 opt.splitright = true
 opt.splitbelow = true
