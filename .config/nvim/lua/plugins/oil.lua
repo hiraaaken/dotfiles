@@ -30,6 +30,7 @@ return {
 				["-"] = "actions.parent",
 				["<C-p>"] = "actions.preview",
 				["<esc>"] = "actions.close",
+				["<leader>q"] = "actions.close",
 				["q"] = nil,
 				["<C-l>"] = "actions.refresh",
 				["_"] = "actions.open_cwd",
@@ -40,7 +41,7 @@ return {
 				["<C-h>"] = "actions.select_split",
 				["<C-t>"] = "actions.select_tab",
     },
-    default_file_explorer = true,
+    default_file_explorer = false,
     view_options = { 
       show_hidden = true,
       is_always_hidden = function(name, _)
