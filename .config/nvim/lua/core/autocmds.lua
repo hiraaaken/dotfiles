@@ -20,3 +20,20 @@ create_autocmd('BufWritePre', {
   end,
   desc = 'Auto mkdir to save file'
 })
+
+-- ディレクトリを引数で開いた場合、dashboard + oil.nvim float を表示
+create_autocmd('VimEnter', {
+  callback = function()
+    local arg = vim.fn.argv(0)
+    -- ディレクトリを引数で開いた場合
+    if arg ~= "" and vim.fn.isdirectory(arg) == 1 then
+      vim.cmd("cd " .. vim.fn.fnameescape(arg))
+      require("snacks").dashboard()
+      -- 少し遅延させてフローティングで開く
+      vim.schedule(function()
+        require("oil").open_float()
+      end)
+    end
+  end,
+  desc = 'Open dashboard and oil.nvim float when opening a directory'
+})
