@@ -41,7 +41,7 @@ return {
 				["<C-h>"] = "actions.select_split",
 				["<C-t>"] = "actions.select_tab",
     },
-    default_file_explorer = false,
+    default_file_explorer = true,
     view_options = { 
       show_hidden = true,
       is_always_hidden = function(name, _)
