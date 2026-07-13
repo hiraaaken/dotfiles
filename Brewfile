@@ -21,6 +21,7 @@ brew "uv"
 brew "mise"
 brew "bat"
 brew "tree-sitter"
+brew "tree-sitter-cli"
 brew "lua-language-server"
 brew "plantuml"
 

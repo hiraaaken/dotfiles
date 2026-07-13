@@ -4,19 +4,22 @@ return {
     dependencies = {
         'nvim-lua/plenary.nvim',
         'stevearc/dressing.nvim',
+        'hrsh7th/cmp-nvim-lsp',
     },
-    opts = {
-        lsp = {
-            color = {
+    opts = function()
+        return {
+            lsp = {
+                color = {
+                    enabled = true,
+                },
+                capabilities = require("cmp_nvim_lsp").default_capabilities(),
+            },
+            widget_guides = {
                 enabled = true,
             },
-            capabilities = require("cmp_nvim_lsp").default_capabilities(),
-        },
-        widget_guides = {
-            enabled = true,
-        },
-        closing_tags = {
-            enabled = true,
-        },
-    },
+            closing_tags = {
+                enabled = true,
+            },
+        }
+    end,
 }
