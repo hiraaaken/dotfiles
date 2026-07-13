@@ -15,7 +15,7 @@ opt.scrolloff = 3
 
 opt.whichwrap = 'bshl<>[]~'
 
-opt.wrap = false
+opt.wrap = true
 
 -- search settings
 opt.ignorecase = true
