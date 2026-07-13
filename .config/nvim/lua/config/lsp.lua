@@ -31,6 +31,14 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     opts.desc = "Show line diagnostics"
     keymap.set("n", "<leader>d", vim.diagnostic.open_float, opts) -- show diagnostics for line
+
+    opts.desc = "Organize imports"
+    keymap.set("n", "<leader>oi", function()
+      vim.lsp.buf.code_action({
+        apply = true,
+        filter = function(a) return vim.startswith(a.kind, "source.organizeImports") end,
+      })
+    end, opts)
   end,
 });
 

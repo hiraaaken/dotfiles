@@ -30,7 +30,6 @@ return {
 				["-"] = "actions.parent",
 				["<C-p>"] = "actions.preview",
 				["<esc>"] = "actions.close",
-				["<leader>q"] = "actions.close",
 				["q"] = nil,
 				["<C-l>"] = "actions.refresh",
 				["_"] = "actions.open_cwd",
