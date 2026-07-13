@@ -1,0 +1,12 @@
+{
+  "name": "node-project",
+  "build": { "dockerfile": "Dockerfile" },
+  // wrangler dev のデフォルトポート。使わない場合は削除してよい
+  "forwardPorts": [8787],
+  "postCreateCommand": "pnpm install",
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}

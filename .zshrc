@@ -73,6 +73,18 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=244"
 # コマンド履歴検索
 zinit ice wait'0';zinit light zdharma/history-search-multi-word
 
+# ghq + fzf でリポジトリ移動
+function fzf-src () {
+  local selected_dir=$(ghq list -p | fzf --prompt="repositories > " --query "$LBUFFER")
+  if [ -n "$selected_dir" ]; then
+    BUFFER="cd ${selected_dir}"
+    zle accept-line
+  fi
+  zle clear-screen
+}
+zle -N fzf-src
+bindkey '^]' fzf-src
+
 # alias
 alias ll="eza --icons -al --group-directories-first"
 alias nv="nvim"
@@ -88,9 +100,7 @@ export PATH=~/.npm-global/bin:$PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="/opt/homebrew/opt/curl/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
-
-# fnm settings
-eval "$(fnm env --use-on-cd)"
+export PATH="$HOME/dev/flutter/bin:$PATH"
 
 # load .zshrc.local
 if [[ -f ~/.zshrc.local ]]; then
@@ -101,3 +111,17 @@ fi
 cd ~
 
 [ -f "/Users/kenta/.ghcup/env" ] && . "/Users/kenta/.ghcup/env" # ghcup-env
+export PATH=$PATH:$HOME/.maestro/bin
+
+# Android SDK
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+
+# pnpm
+export PNPM_HOME="/Users/kenta/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+esac
+# pnpm end
+eval "$(mise activate zsh)"

@@ -2,22 +2,36 @@
 
 # Core
 brew "git"
+brew "curl"
+brew "wget"
 brew "neovim"
-brew "fnm"
 brew "eza"
 
 # Search & Navigation
 brew "ripgrep"
 brew "fd"
+brew "fzf"
+brew "tree"
 
 # Development
 brew "gh"
+brew "ghq"
 brew "lazygit"
-brew "gradle"
 brew "uv"
-brew "fnm"
+brew "mise"
 brew "bat"
 brew "tree-sitter"
+brew "lua-language-server"
+brew "plantuml"
+
+# Database
+tap "tursodatabase/tap"
+brew "turso"
+
+# Container
+brew "colima"
+brew "docker"
+brew "docker-compose"
 
 # Neovim IME support
 tap "daipeihust/tap"
