@@ -9,11 +9,20 @@ return {
     {
       "<leader>e",
       function()
-        vim.cmd.Oil()
+        require("oil").open_float()
       end,
     }
   },
   opts = {
+    float = {
+      padding = 2,
+      max_width = 90,
+      max_height = 30,
+      border = "rounded",
+      win_options = {
+        winblend = 0,
+      },
+    },
     keymaps = {
 				["?"] = "actions.show_help",
 				["gx"] = "actions.open_external",

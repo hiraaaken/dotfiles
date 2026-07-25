@@ -1,1 +1,3 @@
 .zsh_history
+*-e
+.claude/scheduled_tasks.lock

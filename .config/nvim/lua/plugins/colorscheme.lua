@@ -25,6 +25,9 @@ return {
         },
       })
       vim.cmd([[colorscheme kanagawa]])
+
+      -- Dashboard header color override
+      vim.api.nvim_set_hl(0, "SnacksDashboardHeader", { fg = "#dca561", bold = true })
     end,
   },
 }

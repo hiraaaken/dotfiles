@@ -1,5 +1,3 @@
-vim.cmd("let g:netrw_liststyle = 3")
-
 local opt = vim.opt
 
 opt.relativenumber = true
@@ -17,7 +15,7 @@ opt.scrolloff = 3
 
 opt.whichwrap = 'bshl<>[]~'
 
-opt.wrap = false
+opt.wrap = true
 
 -- search settings
 opt.ignorecase = true

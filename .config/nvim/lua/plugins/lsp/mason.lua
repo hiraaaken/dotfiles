@@ -13,6 +13,7 @@ return {
       "prismals",
       "pyright",
       "eslint",
+      "kotlin_lsp",
     },
   },
   dependencies = {
