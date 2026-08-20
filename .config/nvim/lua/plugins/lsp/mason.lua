@@ -1,6 +1,8 @@
 return {
   "williamboman/mason-lspconfig.nvim",
   opts = {
+    -- kotlin_lsp は kotlin.nvim が設定してから起動する必要があるため自動起動から除外
+    automatic_enable = { exclude = { "kotlin_lsp" } },
     ensure_installed = {
       "ts_ls",
       "html",

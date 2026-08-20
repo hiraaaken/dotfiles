@@ -204,6 +204,20 @@
   - `prismals`: Prisma
   - `pyright`: Python
   - `eslint`: ESLint
+  - `kotlin_lsp`: Kotlin（JetBrains 公式 Kotlin LSP。`kotlin.nvim` が設定するため mason-lspconfig の自動起動からは除外）
+
+#### kotlin.nvim
+- **リポジトリ**: `AlexandrosAlexiou/kotlin.nvim`
+- **概要**: JetBrains 公式 Kotlin LSP (`kotlin_lsp`) 用の拡張プラグイン
+- **導入理由**: `kotlin_lsp` 単体だと補完アイテムの insertText が正しく反映されず、import 自動補完や括弧補完が機能しない既知の不具合があるため
+- **機能**:
+  - 補完の insert 位置修正（VS Code クライアント相当の挙動に合わせ、import 自動追加が機能するようになる）
+  - Inlay hints、コードフォールディング
+  - `:KotlinOrganizeImports`、`:KotlinFormat`（IntelliJ IDEA 準拠のフォーマット）
+  - `:KotlinIncomingCalls` / `:KotlinOutgoingCalls`（コールヒエラルキー）
+  - `:KotlinDebug [port]`（DAP 連携のデバッグ）
+- **依存**: `mason.nvim`, `mason-lspconfig.nvim`, `oil.nvim`, `trouble.nvim`
+- **インストール**: `:MasonInstall kotlin-lsp`（zero-dependency ビルド、JDK 不要）
 
 **LSP キーマップ**:
 
