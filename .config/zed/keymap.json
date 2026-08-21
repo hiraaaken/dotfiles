@@ -1,0 +1,42 @@
+[
+  // jj で Insert -> Normal (core/keymaps.lua: keymap.set("i", "jj", "<ESC>"))
+  {
+    "context": "vim_mode == insert",
+    "bindings": {
+      "j j": "vim::NormalBefore"
+    }
+  },
+  {
+    "context": "vim_mode == normal && !menu",
+    "bindings": {
+      // window management (<leader>sv/sh/se/sx)
+      "space s v": "pane::SplitRight",
+      "space s h": "pane::SplitDown",
+      "space s e": "vim::ResetPaneSizes",
+      "space s x": "pane::CloseActiveItem",
+
+      // window move (<C-h/j/k/l>)
+      "ctrl-h": "workspace::ActivatePaneLeft",
+      "ctrl-j": "workspace::ActivatePaneDown",
+      "ctrl-k": "workspace::ActivatePaneUp",
+      "ctrl-l": "workspace::ActivatePaneRight",
+
+      // buffer move (H/L -> previous/next tab)
+      "shift-h": "pane::ActivatePreviousItem",
+      "shift-l": "pane::ActivateNextItem",
+
+      // write / close (<leader>w, <leader>q, <leader>Q)
+      "space w": "workspace::Save",
+      "space q": "pane::CloseActiveItem",
+      "space shift-q": "workspace::CloseWindow"
+    }
+  },
+  {
+    "context": "VimControl && !menu",
+    "bindings": {
+      // cursor move (<leader>h/l -> ^ / $) in normal & visual
+      "space h": ["workspace::SendKeystrokes", "^"],
+      "space l": ["workspace::SendKeystrokes", "$"]
+    }
+  }
+]

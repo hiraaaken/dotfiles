@@ -37,3 +37,6 @@ brew "docker-compose"
 # Neovim IME support
 tap "daipeihust/tap"
 brew "im-select"
+
+# Editor
+cask "zed"
