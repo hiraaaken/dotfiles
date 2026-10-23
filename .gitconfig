@@ -1,0 +1,11 @@
+[user]
+	name = Kenta
+	email = 85465075+hira-kenta@users.noreply.github.com
+[core]
+	editor = code --wait
+[merge]
+	tool = code --wait \"$MERGED\"
+[push]
+	default = simple
+[ghq]
+	root = ~/dev

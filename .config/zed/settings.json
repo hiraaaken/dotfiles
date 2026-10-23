@@ -7,25 +7,51 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
-  "cli_default_open_behavior": "new_window",
-  "session": {
-    "trust_all_worktrees": true
-  },
-  "base_keymap": "JetBrains",
-  "vim_mode": true,
-  "vim": {
-    "toggle_relative_line_numbers": true
+  "cli_default_open_behavior": "existing_window",
+  "autosave": "off",
+  "project_panel": {
+    "dock": "left"
   },
   "agent_servers": {
+    "antigravity-acp": {
+      "type": "registry"
+    },
     "claude-acp": {
+      "default_config_options": {
+        "mode": "auto",
+        "model": "opus"
+      },
       "type": "registry"
     }
   },
-  "ui_font_size": 16,
-  "buffer_font_size": 15,
+  "agent": {
+    "dock": "right",
+    "sidebar_side": "left",
+    "favorite_models": [],
+    "model_parameters": []
+  },
+  "disable_ai": false,
+  "vim_mode": true,
+  "ui_font_size": 14.0,
+  "buffer_font_size": 12.0,
   "theme": {
     "mode": "system",
-    "light": "Ayu Light",
-    "dark": "Ayu Dark",
+    "light": "One Light",
+    "dark": "One Dark",
   },
+
+  // ── ~/.config/nvim/lua/core/options.lua からの移植 ──
+  "relative_line_numbers": "enabled", // relativenumber（boolean ではなく enabled/disabled/wrapped）
+  "vertical_scroll_margin": 3, // scrolloff = 3
+  "current_line_highlight": "all", // cursorline
+  "soft_wrap": "editor_width", // wrap
+  "tab_size": 2, // shiftwidth / tabstop = 2
+  "hard_tabs": false, // expandtab
+  "vim": {
+    "use_system_clipboard": "always", // clipboard = unnamedplus
+    "use_smartcase_find": true, // ignorecase + smartcase
+  },
+  "edit_predictions": {
+    "provider": "copilot",
+  }
 }

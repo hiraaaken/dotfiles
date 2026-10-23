@@ -1,3 +1,10 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 source ~/powerlevel10k/powerlevel10k.zsh-theme
 
 ### Auto Install ###
@@ -27,28 +34,12 @@ zinit light-mode for \
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
-# Add deno completions to search path
-if [[ ":$FPATH:" != *":/Users/kenta/.zsh/completions:"* ]]; then export FPATH="/Users/kenta/.zsh/completions:$FPATH"; fi
-export PATH=$PATH:/opt/homebrew/bin
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-export PATH="$PATH:`pwd`/flutter/bin"
-. "/Users/kenta/.deno/env"
-
 ### 便利設定 ###
 ## パスを入力してもcd
 setopt AUTO_CD
 
 ## 履歴管理
-HISTFILE=$ZDOTDIR/.zsh-history
+HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
 HISTSIZE=100000
 SAVEHIST=1000000
 
@@ -71,7 +62,7 @@ zinit ice wait'0';zinit light zsh-users/zsh-autosuggestions
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=244"
 
 # コマンド履歴検索
-zinit ice wait'0';zinit light zdharma/history-search-multi-word
+zinit ice wait'0';zinit light zdharma-continuum/history-search-multi-word
 
 # ghq + fzf でリポジトリ移動
 function fzf-src () {
@@ -90,38 +81,27 @@ alias ll="eza --icons -al --group-directories-first"
 alias nv="nvim"
 alias dc="docker compose"
 
-# PATH settings
-export PNPM_HOME="/Users/kenta/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-export PATH=~/.npm-global/bin:$PATH
-export PATH="$HOME/.cargo/bin:$PATH"
+# PATH settings（後に書いたものほど優先）
+export PATH="$PATH:$HOME/.maestro/bin"
+export PATH="$HOME/.npm-global/bin:$PATH"
 export PATH="/opt/homebrew/opt/curl/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/dev/flutter/bin:$PATH"
-
-# load .zshrc.local
-if [[ -f ~/.zshrc.local ]]; then
-    source ~/.zshrc.local
-fi
-
-# Set working dir
-cd ~
-
-[ -f "/Users/kenta/.ghcup/env" ] && . "/Users/kenta/.ghcup/env" # ghcup-env
-export PATH=$PATH:$HOME/.maestro/bin
 
 # Android SDK
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
 # pnpm
-export PNPM_HOME="/Users/kenta/Library/pnpm"
+export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME/bin:"*) ;;
   *) export PATH="$PNPM_HOME/bin:$PATH" ;;
 esac
 # pnpm end
+
 eval "$(mise activate zsh)"
+
+# load .zshrc.local
+if [[ -f ~/.zshrc.local ]]; then
+    source ~/.zshrc.local
+fi
