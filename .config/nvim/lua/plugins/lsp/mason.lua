@@ -7,6 +7,8 @@ return {
       "cssls",
       "tailwindcss",
       "svelte",
+      "vue_ls",
+      "elmls",
       "lua_ls",
       "graphql",
       "emmet_ls",

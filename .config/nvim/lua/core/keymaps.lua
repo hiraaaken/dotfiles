@@ -53,7 +53,7 @@ vim.keymap.set("n", "<leader>q", function()
   local bd = require("mini.bufremove").delete
 
   if vim.bo.modified then
-    local choice = vim.fn.confirm(("Save changes to %q?"):format(vim.fn.bufname()), "&Yes¥n&No¥n&Cancel")
+    local choice = vim.fn.confirm(("Save changes to %q?"):format(vim.fn.bufname()), "&Yes\n&No\n&Cancel")
     if choice == 1 then vim.cmd("write") end
     if choice == 3 then return end
   end
