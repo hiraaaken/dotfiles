@@ -134,13 +134,19 @@ function M.has_same_path_mount(p, cb)
   run(p, { "docker", "inspect", "--format", "{{json .Mounts}}", p.container_id }, nil, function(code, stdout)
     local ok, mounts = pcall(vim.json.decode, stdout)
     if code ~= 0 or not ok then return cb(false) end
+    local want = {
+      [p.git_root] = true,
+      [require("devcontainer.tools").dir] = true,
+      [require("devcontainer.tools").claude_dir] = true,
+    }
     for _, m in ipairs(mounts) do
-      if m.Destination == p.git_root then return cb(true) end
+      want[m.Destination] = nil
     end
-    cb(false)
+    cb(next(want) == nil)
   end)
 end
 
 M.append_log = append_log
+M.run = run
 
 return M

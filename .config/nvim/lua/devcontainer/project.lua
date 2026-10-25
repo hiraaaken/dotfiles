@@ -8,6 +8,7 @@ local store_path = state_dir .. "/projects.json"
 ---@field root string .devcontainer のあるディレクトリ
 ---@field git_root string マウント元（git ルート。git 管理外なら root）
 ---@field status "idle"|"starting"|"ready"|"failed"|"stopped"
+---@field mode? "container"|"host" C5 の答え（nil は未回答）
 ---@field container_id? string
 ---@field remote_user? string
 ---@field log string[]
@@ -74,19 +75,34 @@ function M.get(root)
   return M.projects[root]
 end
 
---- バッファが属するプロジェクト（未検出・管理外なら nil）
+--- バッファの devcontainer ルート（プロジェクト外なら nil）
 ---@param buf? integer
----@return devcontainer.Project?
-function M.for_buf(buf)
-  buf = buf or 0
-  local name = vim.api.nvim_buf_get_name(buf)
+---@return string?
+function M.root_for_buf(buf)
+  local name = vim.api.nvim_buf_get_name(buf or 0)
   -- oil:// などのスキームや無名バッファはカレントディレクトリで判断する
   if name == "" or name:match("^%a+://") then
     local oil_dir = name:match("^oil://(.*)")
     name = oil_dir or vim.fn.getcwd()
   end
-  local root = M.find_root(name)
+  return M.find_root(name)
+end
+
+--- バッファが属するプロジェクト（未検出・管理外なら nil）
+---@param buf? integer
+---@return devcontainer.Project?
+function M.for_buf(buf)
+  local root = M.root_for_buf(buf)
   return root and M.projects[root] or nil
+end
+
+--- 読み込み済みのバッファのうち、プロジェクト配下のもの
+---@param p devcontainer.Project
+---@return integer[]
+function M.bufs(p)
+  return vim.tbl_filter(function(b)
+    return vim.api.nvim_buf_is_loaded(b) and M.root_for_buf(b) == p.root
+  end, vim.api.nvim_list_bufs())
 end
 
 --- .devcontainer 配下のファイル内容から作るハッシュ（設定変更の検知用）

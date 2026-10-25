@@ -1,12 +1,18 @@
 -- Dev Container 連携。要件は docs/devcontainer-nvim.md
 local project = require("devcontainer.project")
 local cli = require("devcontainer.cli")
+local tools = require("devcontainer.tools")
+local lsp = require("devcontainer.lsp")
+local claude = require("devcontainer.claude")
 
 local M = {}
 
+--- devcontainer CLI があり、連携が有効か
+M.enabled = false
+
 --- 上書き用設定を書き出す直前に呼ばれるフック（後段のモジュールが runArgs などを足す）
 ---@type fun(config: table, p: devcontainer.Project)[]
-M.override_hooks = {}
+M.override_hooks = { tools.add_mounts }
 
 local function notify(msg, level)
   vim.notify(msg, level or vim.log.levels.INFO, { title = "devcontainer" })
@@ -28,6 +34,18 @@ function M.on_ready(p, fn)
   table.insert(waiters[p.root], fn)
 end
 
+--- コンテナの準備ができたら fn を呼ぶ。準備中（確認待ちを含む）なら「起動中です」と出して待つ（T4）
+---@param p devcontainer.Project
+---@param fn fun(p: devcontainer.Project)
+function M.when_ready(p, fn)
+  if p.status == "ready" then return fn(p) end
+  if p.status == "starting" or (p.mode == nil and p.status == "idle") then
+    notify("コンテナを起動中です。準備ができたら開きます")
+    return M.on_ready(p, fn)
+  end
+  notify("コンテナが起動していません（:DevcontainerUp で起動）", vim.log.levels.WARN)
+end
+
 local function set_status(p, status)
   p.status = status
   if status ~= "starting" then p.phase = nil end
@@ -38,6 +56,7 @@ local function set_status(p, status)
     vim.api.nvim_exec_autocmds("User", { pattern = "DevcontainerReady", data = { root = p.root } })
   elseif status == "failed" or status == "stopped" then
     waiters[p.root] = nil
+    lsp.stop(p)
   end
 end
 
@@ -46,13 +65,16 @@ end
 function M.start(p, opts)
   opts = opts or {}
   if p.status == "starting" then return end
+  p.mode = "container"
+  p.commands = nil
+  lsp.stop(p)
   set_status(p, "starting")
   notify(("%s のコンテナを起動しています…"):format(name(p)))
   cli.up(p, opts, function(ok, err)
     if not ok and err == "mount_mismatch" then
       set_status(p, "failed")
       vim.ui.select({ "作り直す", "やめる" }, {
-        prompt = ("%s の既存コンテナは手元と同じパスでマウントされていません"):format(name(p)),
+        prompt = ("%s の既存コンテナには、手元と同じパスやツールのボリュームがマウントされていません"):format(name(p)),
       }, function(choice)
         if choice == "作り直す" then M.start(p, { rebuild = true }) end
       end)
@@ -65,8 +87,18 @@ function M.start(p, opts)
       return
     end
     project.remember(p.root, { config_hash = project.config_hash(p.root) })
-    set_status(p, "ready")
-    notify(("%s のコンテナが起動しました"):format(name(p)))
+    tools.prepare(p, function()
+      if not p.tools_ok then
+        notify(("%s: ボリュームのツールが使えません。npm の LSP と Claude は動きません（:DevcontainerLog）"):format(name(p)),
+          vim.log.levels.WARN)
+      end
+      p.phase = "設定をコピー中"
+      claude.on_container_created(p, function()
+        set_status(p, "ready")
+        notify(("%s のコンテナが起動しました"):format(name(p)))
+        lsp.retrigger(p)
+      end)
+    end)
   end)
 end
 
@@ -87,6 +119,14 @@ end
 
 local asked = {}
 
+--- コンテナを使わないと決めたら、手元で LSP を起動し直す
+---@param p devcontainer.Project
+local function use_host(p)
+  if p.status ~= "idle" then return end
+  p.mode = "host"
+  lsp.retrigger(p)
+end
+
 --- 未対応のプロジェクトを見つけたときの確認（C5）
 ---@param root string
 local function handle_root(root)
@@ -95,7 +135,7 @@ local function handle_root(root)
   local p = project.get(root)
   local choice = project.remembered(root).choice
   if choice == "always" then return start_checked(p) end
-  if choice == "never" then return end
+  if choice == "never" then return use_host(p) end
 
   local items = {
     { label = "起動する", run = function() start_checked(p) end },
@@ -103,16 +143,19 @@ local function handle_root(root)
       project.remember(root, { choice = "always" })
       start_checked(p)
     end },
-    { label = "今回は使わない", run = function() end },
+    { label = "今回は使わない", run = function() use_host(p) end },
     { label = "このプロジェクトでは使わない", run = function()
       project.remember(root, { choice = "never" })
+      use_host(p)
     end },
   }
   vim.ui.select(items, {
     prompt = ("%s に devcontainer.json が見つかりました"):format(name(p)),
     format_item = function(item) return item.label end,
   }, function(item)
-    if item then item.run() end
+    -- 閉じたら今回は使わない扱い
+    item = item or items[3]
+    item.run()
   end)
 end
 
@@ -170,7 +213,7 @@ end
 --- ステータスライン用の表示（管理外なら空文字）
 function M.status()
   local p = project.for_buf(0)
-  if not p then return "" end
+  if not p or p.mode == "host" then return "" end
   local icons = { idle = "󰆧 ", starting = "󰑓 ", ready = " ", failed = " ", stopped = "󰆧 " }
   local text = icons[p.status] .. name(p)
   if p.status == "starting" and p.phase then text = text .. " · " .. p.phase end
@@ -178,7 +221,10 @@ function M.status()
 end
 
 function M.setup()
+  require("devcontainer.terminal").setup()
   if vim.fn.executable("devcontainer") == 0 then return end
+  M.enabled = true
+  lsp.setup()
 
   local group = vim.api.nvim_create_augroup("devcontainer", {})
   vim.api.nvim_create_autocmd({ "VimEnter", "BufEnter" }, {
@@ -188,7 +234,7 @@ function M.setup()
   if vim.v.vim_did_enter == 1 then detect(vim.api.nvim_get_current_buf()) end
 
   local commands = {
-    DevcontainerUp = function(p) M.start(p) end,
+    DevcontainerUp = function(p) start_checked(p) end,
     DevcontainerRebuild = function(p) M.start(p, { rebuild = true }) end,
     DevcontainerStop = function(p)
       cli.stop(p, function(ok)
@@ -199,6 +245,12 @@ function M.setup()
       end)
     end,
     DevcontainerLog = function(p) M.show_log(p) end,
+    DevcontainerSyncClaude = function(p)
+      M.when_ready(p, claude.sync)
+    end,
+    DevcontainerAgent = function(p)
+      M.when_ready(p, require("devcontainer.agent").open)
+    end,
     DevcontainerForget = function(p)
       project.remember(p.root, nil)
       asked[p.root] = nil
