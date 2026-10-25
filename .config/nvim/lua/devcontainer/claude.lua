@@ -156,8 +156,9 @@ function M.open(p, args)
   -- エージェント用（agent.lua）の認証は取り込まない（エージェントが別のアカウントにすり替えられるため）
   local script = M.sync_auth_script(p, user)
   tools.exec(p, "root", { "sh", "-c", script }, function()
-    local terminal = require("devcontainer.terminal")
-    terminal.focus(cmd, { cwd = p.root, win = terminal.win })
+    -- --resume などの引数ごとに一つ。開いていればそれを表示する
+    local key = ("claude:%s:%s"):format(p.root, table.concat(args or {}, " "))
+    require("devcontainer.terminal").open({ cmd = cmd, cwd = p.root, name = "claude", key = key })
   end)
 end
 
