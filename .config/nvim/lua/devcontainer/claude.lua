@@ -156,7 +156,8 @@ function M.open(p, args)
   -- エージェント用（agent.lua）の認証は取り込まない（エージェントが別のアカウントにすり替えられるため）
   local script = M.sync_auth_script(p, user)
   tools.exec(p, "root", { "sh", "-c", script }, function()
-    Snacks.terminal.toggle(cmd, { cwd = p.root })
+    local terminal = require("devcontainer.terminal")
+    terminal.focus(cmd, { cwd = p.root, win = terminal.win })
   end)
 end
 

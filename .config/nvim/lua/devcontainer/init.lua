@@ -99,6 +99,8 @@ function M.start(p, opts)
         set_status(p, "ready")
         notify(("%s のコンテナが起動しました"):format(name(p)))
         lsp.retrigger(p)
+        -- 右にコンテナのシェルを開いておく（vim.g.devcontainer_auto_terminal = false で開かない）
+        if vim.g.devcontainer_auto_terminal ~= false then require("devcontainer.terminal").open_beside(p) end
       end)
     end)
   end) end)

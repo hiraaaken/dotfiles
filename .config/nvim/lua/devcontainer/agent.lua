@@ -217,12 +217,13 @@ function M.open(p)
             return fail(cfg_err)
           end
           claude.copy_git_identity(p, M.user, function()
-            local term = Snacks.terminal.toggle({
+            local terminal = require("devcontainer.terminal")
+            local term = terminal.focus({
               "docker", "exec", "-it", "-w", p.root, "-u", M.user,
               "-e", "CLAUDE_CONFIG_DIR=" .. M.config_dir(p),
               "-e", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
               p.container_id, tools.prefix(p) .. "/npm/bin/claude", "--dangerously-skip-permissions",
-            }, { cwd = p.root })
+            }, { cwd = p.root, win = terminal.win })
             notify("エージェントが終了するまで、コンテナ全体の通信を許可リストの宛先に制限します")
             if term and term.buf and not vim.b[term.buf].devcontainer_agent then
               vim.b[term.buf].devcontainer_agent = true
