@@ -105,7 +105,7 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 決定事項を実装に落とすときに決めたこと。
 
 - **ボリューム**: `nvim-devcontainer-tools`（`/opt/nvim-dc`、読み取り専用でマウント）と `nvim-devcontainer-claude`（`/opt/nvim-dc-claude`）。ツールは `node:22-slim`（musl のイメージなら `node:22-alpine`）のヘルパーコンテナから入れる。中身は手元の mason の npm パッケージと同じバージョンに `typescript@5` と Claude Code を足したもの。一覧が変わったら入れ直す。入れ直しはバージョンごとのディレクトリ（`/opt/nvim-dc/glibc.<stamp>`）に入れてシンボリックリンクで切り替え、直前のバージョンは残す（他のコンテナで動いている LSP が使っているため）。ボリュームの無い既存コンテナは、同じパスのマウントが無いときと同じく作り直すか確認する
-- **LSP**: `vim.lsp.start` を包んで、`docker exec -i` 経由の cmd に差し替える。コンテナから見えない手元の PID で LSP が終了しないよう、`processId` は送らない。cmd が関数の lspconfig 設定（ts_ls など）は、関数版と同じく `node_modules/.bin` を優先する。コマンドがコンテナに無ければ（mason の npm 以外の LSP や `elm` など）警告して起動しない（L6）
+- **LSP**: `vim.lsp.start` を包んで、`docker exec -i` 経由の cmd に差し替える。コンテナから見えない手元の PID で LSP が終了しないよう、`processId` は送らない。cmd が関数の lspconfig 設定（ts_ls など）は、関数版と同じく `node_modules/.bin` を優先する。コマンドがコンテナに無ければ（mason の npm 以外の LSP や `elm` など）警告して起動しない（L6）。oxfmt（Vite+ の整形）は mason で入れず、プロジェクトの `node_modules/.bin`、無ければ `vite-plus` の実体の隣（pnpm では `.bin` に置かれないため）から探す
 - **確認**: C5 の確認を閉じたら未回答のままにする。答えるまではプロジェクトの LSP もホストの Claude も起動しない（`:DevcontainerUp` で起動できる）
 - **ツールの更新**: インストールは 15 分で打ち切る。ツールのボリュームは読み取り専用なので、Claude Code の自動更新は止めている
 - **TypeScript**: プロジェクトの `node_modules/typescript` があればそれを、無ければボリュームの `typescript@5` を使う（TypeScript 7 には `tsserver.js` が無い）
@@ -125,6 +125,7 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 - 共有のログインの移行・プロジェクト間の伝播、シンボリックリンクを読まないこと、`mcpServers` などが引き継がれないこと、`nvim-agent` から読めないこと
 - エージェント用の設定を root がコピーするとき、`nvim-agent` が置いたシンボリックリンクをたどらないこと
 - ツールの入れ直しで、旧構成（実ディレクトリ）から移行し、直前のバージョンが残ること
+- pnpm で Vite+ を入れたプロジェクトで、oxfmt がコンテナ内で動き、保存時に整形されること。oxfmt を使わないプロジェクトでは保存時に整形しないこと
 - C5 の確認の各選択肢・閉じたとき、`:DevcontainerForget` / `Up` / `Stop` / `Rebuild`（LSP の終了とつなぎ直し）
 - コンテナのシェル（起動待ちを含む）、ホストのシェル、ターミナルモードからの `<C-/>`
 - ts_ls・vue_ls などがコンテナ内で動き診断を返すこと、起動前・確認前は LSP が動かないこと、Copilot は手元のまま

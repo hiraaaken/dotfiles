@@ -22,7 +22,23 @@ local function_cmds = {
   cssls = { "vscode-css-language-server", "--stdio" },
   svelte = { "svelteserver", "--stdio" },
   eslint = { "vscode-eslint-language-server", "--stdio" },
+  oxfmt = { "oxfmt", "--lsp" },
 }
+
+--- プロジェクトの node_modules にあるコマンド。Vite+ は oxfmt などを依存として持つが、
+--- pnpm だと node_modules/.bin に置かれないので、vite-plus の実体の隣も探す
+---@param root string
+---@param name string
+---@return string?
+local function project_bin(root, name)
+  local bin = vim.fs.joinpath(root, "node_modules/.bin", name)
+  if vim.uv.fs_stat(bin) then return bin end
+  local vite_plus = vim.uv.fs_realpath(vim.fs.joinpath(root, "node_modules/vite-plus"))
+  if not vite_plus then return end
+  bin = vim.fs.joinpath(vim.fs.dirname(vite_plus), name, "bin", name)
+  if vim.uv.fs_stat(bin) then return bin end
+end
+M.project_bin = project_bin
 
 ---@type table<integer, string> client id → プロジェクトのルート
 local clients = {}
@@ -126,8 +142,7 @@ local function to_container(p, config)
       warn_once(p.root .. config.name, ("%s は cmd が関数のため、コンテナでは起動しません"):format(config.name))
       return
     end
-    local local_bin = vim.fs.joinpath(config.root_dir or p.root, "node_modules/.bin", host_cmd[1])
-    if vim.uv.fs_stat(local_bin) then host_cmd[1] = local_bin end
+    host_cmd[1] = project_bin(config.root_dir or p.root, host_cmd[1]) or host_cmd[1]
   end
   local bin = host_cmd[1]:sub(1, 1) == "/" and vim.startswith(host_cmd[1], p.git_root) and host_cmd[1]
     or vim.fs.basename(host_cmd[1])

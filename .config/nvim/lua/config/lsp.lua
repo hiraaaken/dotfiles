@@ -42,6 +42,32 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 });
 
+-- oxfmt（Vite+ の整形）は mason で入れず、プロジェクトのものを使う。
+-- 起動するのは package.json などで oxfmt / vite-plus を使っているプロジェクトだけ（lspconfig の root_dir）
+vim.lsp.config("oxfmt", {
+  cmd = function(dispatchers, config)
+    local bin = require("devcontainer.lsp").project_bin((config or {}).root_dir or vim.fn.getcwd(), "oxfmt")
+    return vim.lsp.rpc.start({ bin or "oxfmt", "--lsp" }, dispatchers)
+  end,
+})
+vim.lsp.enable("oxfmt")
+
+-- 保存時に整形する。ts_ls などの整形はプロジェクトの書式と合わないことがあるので、
+-- 整形専用の LSP がつながっているときだけ、それで整形する
+local formatters = { oxfmt = true }
+vim.api.nvim_create_autocmd("BufWritePre", {
+  group = vim.api.nvim_create_augroup("UserFormatOnSave", {}),
+  callback = function(ev)
+    local clients = vim.lsp.get_clients({ bufnr = ev.buf, method = "textDocument/formatting" })
+    if not vim.iter(clients):any(function(c) return formatters[c.name] end) then return end
+    vim.lsp.buf.format({
+      bufnr = ev.buf,
+      timeout_ms = 3000,
+      filter = function(c) return formatters[c.name] end,
+    })
+  end,
+})
+
 local severity = vim.diagnostic.severity
 
 vim.diagnostic.config({
