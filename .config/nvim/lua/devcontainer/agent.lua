@@ -139,6 +139,7 @@ function M.open(p)
             Snacks.terminal.toggle({
               "docker", "exec", "-it", "-w", p.root, "-u", M.user,
               "-e", "CLAUDE_CONFIG_DIR=" .. M.config_dir,
+              "-e", "DISABLE_AUTOUPDATER=1",
               p.container_id, tools.prefix(p) .. "/npm/bin/claude", "--dangerously-skip-permissions",
             }, { cwd = p.root })
           end)

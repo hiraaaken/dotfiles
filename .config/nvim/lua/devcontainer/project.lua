@@ -9,6 +9,7 @@ local store_path = state_dir .. "/projects.json"
 ---@field git_root string マウント元（git ルート。git 管理外なら root）
 ---@field status "idle"|"starting"|"ready"|"failed"|"stopped"
 ---@field mode? "container"|"host" C5 の答え（nil は未回答）
+---@field asking? boolean C5 の確認を表示中
 ---@field container_id? string
 ---@field remote_user? string
 ---@field log string[]

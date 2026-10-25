@@ -81,14 +81,22 @@ local function install(p, pkgs, stamp, cb)
     ("rm -rf %s && mv %s.tmp %s"):format(d, d, d),
     ("echo %s > %s/.stamp"):format(stamp, d),
   }, "\n")
+  -- 名前を固定して、同時に二つ入れないようにする。時間切れのときはこの名前で消す
+  local name = "nvim-devcontainer-install-" .. p.libc
   local cmd = {
-    "docker", "run", "--rm",
+    "docker", "run", "--rm", "--name", name,
     "-v", M.volume .. ":" .. M.dir,
     helper_images[p.libc],
     "sh", "-c", script, "sh",
   }
   vim.list_extend(cmd, pkgs)
-  cli.run(p, cmd, function(line) cli.append_log(p, line) end, function(code) cb(code == 0) end)
+  cli.run(p, cmd, function(line) cli.append_log(p, line) end, function(code)
+    if code == 124 then
+      cli.append_log(p, "ツールのインストールが時間切れになりました")
+      vim.system({ "docker", "rm", "-f", name })
+    end
+    cb(code == 0)
+  end, 15 * 60 * 1000)
 end
 
 --- コンテナの libc を調べ、ボリュームのツールが古ければ入れ直し、動くか確かめる

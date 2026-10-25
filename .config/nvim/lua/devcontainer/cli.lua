@@ -15,11 +15,13 @@ end
 ---@param cmd string[]
 ---@param on_line? fun(line: string) stderr の1行ごと
 ---@param on_exit fun(code: integer, stdout: string)
-local function run(p, cmd, on_line, on_exit)
+---@param timeout? integer ミリ秒。超えたら止めて code 124 を返す
+local function run(p, cmd, on_line, on_exit, timeout)
   append_log(p, "$ " .. table.concat(cmd, " "))
   local partial = ""
   local ok, err = pcall(vim.system, cmd, {
     text = true,
+    timeout = timeout,
     stderr = function(_, data)
       if not data then return end
       local lines = vim.split(partial .. data, "\n")

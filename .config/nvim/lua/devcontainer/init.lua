@@ -39,7 +39,7 @@ end
 ---@param fn fun(p: devcontainer.Project)
 function M.when_ready(p, fn)
   if p.status == "ready" then return fn(p) end
-  if p.status == "starting" or (p.mode == nil and p.status == "idle") then
+  if p.status == "starting" or p.asking then
     notify("コンテナを起動中です。準備ができたら開きます")
     return M.on_ready(p, fn)
   end
@@ -149,13 +149,16 @@ local function handle_root(root)
       use_host(p)
     end },
   }
+  p.asking = true
   vim.ui.select(items, {
     prompt = ("%s に devcontainer.json が見つかりました"):format(name(p)),
     format_item = function(item) return item.label end,
   }, function(item)
-    -- 閉じたら今回は使わない扱い
-    item = item or items[3]
-    item.run()
+    p.asking = nil
+    if item then return item.run() end
+    -- 閉じたら未回答のまま（プロジェクトの LSP もホストの Claude も起動しない）
+    waiters[p.root] = nil
+    notify("devcontainer を使うか未回答です。:DevcontainerUp で起動できます", vim.log.levels.WARN)
   end)
 end
 

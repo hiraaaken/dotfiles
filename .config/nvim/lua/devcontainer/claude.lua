@@ -94,6 +94,8 @@ function M.open(p, args)
   local cmd = {
     "docker", "exec", "-it", "-w", p.root, "-u", user,
     "-e", "CLAUDE_CONFIG_DIR=" .. M.config_dir,
+    -- ボリュームは読み取り専用なので自分では更新できない
+    "-e", "DISABLE_AUTOUPDATER=1",
     p.container_id, tools.prefix(p) .. "/npm/bin/claude",
   }
   vim.list_extend(cmd, args or {})

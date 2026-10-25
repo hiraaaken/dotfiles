@@ -106,7 +106,8 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 
 - **ボリューム**: `nvim-devcontainer-tools`（`/opt/nvim-dc`、読み取り専用でマウント）と `nvim-devcontainer-claude`（`/opt/nvim-dc-claude`）。ツールは `node:22-slim`（musl のイメージなら `node:22-alpine`）のヘルパーコンテナから入れる。中身は手元の mason の npm パッケージと同じバージョンに `typescript@5` と Claude Code を足したもの。一覧が変わったら入れ直す。ボリュームの無い既存コンテナは、同じパスのマウントが無いときと同じく作り直すか確認する
 - **LSP**: `vim.lsp.start` を包んで、`docker exec -i` 経由の cmd に差し替える。コンテナから見えない手元の PID で LSP が終了しないよう、`processId` は送らない。cmd が関数の lspconfig 設定（ts_ls など）は、関数版と同じく `node_modules/.bin` を優先する。コマンドがコンテナに無ければ（mason の npm 以外の LSP や `elm` など）警告して起動しない（L6）
-- **確認**: C5 の確認を閉じたら「今回は使わない」とみなす。答えるまではプロジェクトの LSP もホストの Claude も起動しない
+- **確認**: C5 の確認を閉じたら未回答のままにする。答えるまではプロジェクトの LSP もホストの Claude も起動しない（`:DevcontainerUp` で起動できる）
+- **ツールの更新**: インストールは 15 分で打ち切る。ツールのボリュームは読み取り専用なので、Claude Code の自動更新は止めている
 - **TypeScript**: プロジェクトの `node_modules/typescript` があればそれを、無ければボリュームの `typescript@5` を使う（TypeScript 7 には `tsserver.js` が無い）
 - **Claude の認証**: 設定は `CLAUDE_CONFIG_DIR=/opt/nvim-dc-claude/config`。認証ファイルは 0600 なので、開くたびにそのコンテナのユーザーへ持ち主を合わせる
 - **エージェント**: 専用ユーザーは `nvim-agent`。sudo が使えたら中止する。認証は普段の設定から `/opt/nvim-dc-claude/agent` へコピーし、トークンは新しい方を両方向に取り込む。`--dangerously-skip-permissions` で起動する
