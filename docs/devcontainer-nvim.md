@@ -113,3 +113,13 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 - **エージェント**: 専用ユーザーは `nvim-agent`。sudo が使えたら中止する。認証は普段の設定から `/opt/nvim-dc-claude/agent` へコピーし、トークンは新しい方を両方向に取り込む。`--dangerously-skip-permissions` で起動する
 - **通信制限**: `nvim-agent` の uid の OUTPUT だけを、ループバック・DNS・許可リストの宛先に制限する（IPv6 は DNS 以外すべて拒否）。宛先は起動のたびに引き直す。既定は Anthropic の API と認証・テレメトリの宛先で、`vim.g.devcontainer_agent_allowlist` で足せる。ルールを設定できなければ起動しない
 - **git**: `safe.directory=*` を system に設定する（マウントしたファイルの持ち主がコンテナのユーザーと違って見えるため）
+
+## 検証
+
+`node:22-bookworm` のテスト用コンテナ（colima, aarch64）で確認した。
+
+- C5 の確認の各選択肢・閉じたとき、`:DevcontainerForget` / `Up` / `Stop` / `Rebuild`（LSP の終了とつなぎ直し）
+- コンテナのシェル（起動待ちを含む）、ホストのシェル、ターミナルモードからの `<C-/>`
+- ts_ls・vue_ls などがコンテナ内で動き診断を返すこと、起動前・確認前は LSP が動かないこと、Copilot は手元のまま
+- Claude の設定と git の名前・メールのコピー、ホストの Claude の封鎖
+- コンテナ内で `/login` した本物の認証で、`nvim-agent` の Claude が許可リスト内の API に応答し、許可リスト外（example.com）には繋がらないこと。普段のユーザーは制限されないこと
