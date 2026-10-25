@@ -14,6 +14,7 @@ local store_path = state_dir .. "/projects.json"
 ---@field remote_user? string
 ---@field log string[]
 ---@field phase? string 起動中の進み具合
+---@field agent_active? boolean エージェントのためにコンテナ全体の通信を制限している
 
 ---@type table<string, devcontainer.Project>
 M.projects = {}

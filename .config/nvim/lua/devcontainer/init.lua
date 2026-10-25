@@ -61,12 +61,14 @@ local function set_status(p, status)
 end
 
 ---@param p devcontainer.Project
----@param opts? { rebuild?: boolean }
+---@param opts? { rebuild?: boolean, stale?: boolean } stale: 設定の変更を反映せずに起動する（次回も確認する）
 function M.start(p, opts)
   opts = opts or {}
   if p.status == "starting" then return end
   p.mode = "container"
   p.commands = nil
+  -- 作り直しや再開でネットワークも作り直されるので、エージェント用の制限は消える
+  p.agent_active = nil
   set_status(p, "starting")
   notify(("%s のコンテナを起動しています…"):format(name(p)))
   -- 作り直すとコンテナごと消えるので、先に LSP を終了させておく
@@ -74,7 +76,7 @@ function M.start(p, opts)
     if not ok and err == "mount_mismatch" then
       set_status(p, "failed")
       vim.ui.select({ "作り直す", "やめる" }, {
-        prompt = ("%s の既存コンテナには、手元と同じパスやツールのボリュームがマウントされていません"):format(name(p)),
+        prompt = ("%s の既存コンテナには、手元と同じパス・ツールのボリューム・.git などの保護がマウントされていません"):format(name(p)),
       }, function(choice)
         if choice == "作り直す" then M.start(p, { rebuild = true }) end
       end)
@@ -86,7 +88,7 @@ function M.start(p, opts)
       M.show_log(p)
       return
     end
-    project.remember(p.root, { config_hash = project.config_hash(p.root) })
+    if not opts.stale then project.remember(p.root, { config_hash = project.config_hash(p.root) }) end
     tools.prepare(p, function()
       if not p.tools_ok then
         notify(("%s: ボリュームのツールが使えません。npm の LSP と Claude は動きません（:DevcontainerLog）"):format(name(p)),
@@ -110,7 +112,7 @@ local function start_checked(p)
     vim.ui.select({ "作り直す", "そのまま起動する" }, {
       prompt = ("%s の devcontainer 設定が変わっています"):format(name(p)),
     }, function(choice)
-      if choice then M.start(p, { rebuild = choice == "作り直す" }) end
+      if choice then M.start(p, { rebuild = choice == "作り直す", stale = choice ~= "作り直す" }) end
     end)
   else
     M.start(p)
@@ -220,6 +222,7 @@ function M.status()
   local icons = { idle = "󰆧 ", starting = "󰑓 ", ready = " ", failed = " ", stopped = "󰆧 " }
   local text = icons[p.status] .. name(p)
   if p.status == "starting" and p.phase then text = text .. " · " .. p.phase end
+  if p.agent_active then text = text .. " · 󰒃 agent" end
   return text
 end
 
@@ -235,6 +238,10 @@ function M.setup()
     callback = function(ev) detect(ev.buf) end,
   })
   if vim.v.vim_did_enter == 1 then detect(vim.api.nvim_get_current_buf()) end
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = group,
+    callback = function() require("devcontainer.agent").lift_all_sync() end,
+  })
 
   local commands = {
     DevcontainerUp = function(p) start_checked(p) end,
@@ -244,6 +251,7 @@ function M.setup()
       lsp.stop(p, function()
         cli.stop(p, function(ok)
           if ok then
+            p.agent_active = nil
             set_status(p, "stopped")
             notify(("%s のコンテナを止めました"):format(name(p)))
           end

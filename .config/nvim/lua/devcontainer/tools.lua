@@ -73,13 +73,22 @@ M.exec = exec
 ---@param cb fun(ok: boolean)
 local function install(p, pkgs, stamp, cb)
   local d = M.prefix(p)
+  local new = ("%s.%s"):format(d, stamp)
+  -- 他のコンテナで動いている LSP が使っているので、入れ替えずにバージョンごとのディレクトリへ入れ、
+  -- シンボリックリンクで切り替える。直前のバージョンは残す（動いている LSP は実体のパスで読み込んでいる）
   local script = table.concat({
     "set -eu",
-    ("rm -rf %s.tmp && mkdir -p %s.tmp/node/bin"):format(d, d),
-    ("cp /usr/local/bin/node %s.tmp/node/bin/"):format(d),
-    ('npm install -g --no-fund --no-audit --prefix %s.tmp/npm "$@" 1>&2'):format(d),
-    ("rm -rf %s && mv %s.tmp %s"):format(d, d, d),
-    ("echo %s > %s/.stamp"):format(stamp, d),
+    ("rm -rf %s.tmp && mkdir -p %s.tmp/node/bin"):format(new, new),
+    ("cp /usr/local/bin/node %s.tmp/node/bin/"):format(new),
+    ('npm install -g --no-fund --no-audit --prefix %s.tmp/npm "$@" 1>&2'):format(new),
+    ("echo %s > %s.tmp/.stamp"):format(stamp, new),
+    ("rm -rf %s && mv %s.tmp %s"):format(new, new, new),
+    'prev=""',
+    ("if [ -L %s ]; then prev=$(readlink %s); elif [ -d %s ]; then mv %s %s.old; prev=%s.old; fi")
+      :format(d, d, d, d, d, vim.fs.basename(d)),
+    ("ln -sfn %s %s"):format(vim.fs.basename(new), d),
+    ("for x in %s.*; do b=${x##*/}; [ \"$b\" = %s ] || [ \"$b\" = \"$prev\" ] || rm -rf \"$x\"; done")
+      :format(d, vim.fs.basename(new)),
   }, "\n")
   -- 名前を固定して、同時に二つ入れないようにする。時間切れのときはこの名前で消す
   local name = "nvim-devcontainer-install-" .. p.libc

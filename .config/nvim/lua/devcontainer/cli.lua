@@ -58,6 +58,40 @@ local function handle_json_log(p, line)
   end
 end
 
+--- コンテナから書き換えられると、ホストでコマンドが実行されてしまうパス。読み取り専用で重ねてマウントする
+--- - .git/config（core.fsmonitor など）・hooks・lazygit.yml: ホストの git や lazygit が実行する
+--- - devcontainer の設定: initializeCommand はホストで実行される
+--- まだ無いものはコンテナ内で作られないよう、先に手元で作っておく
+---@param p devcontainer.Project
+---@return string[]
+function M.protected_paths(p)
+  local paths = {}
+  local git_dir = p.git_root .. "/.git"
+  local stat = vim.uv.fs_stat(git_dir)
+  if stat and stat.type == "directory" then
+    vim.fn.mkdir(git_dir .. "/hooks", "p")
+    local f = io.open(git_dir .. "/lazygit.yml", "a")
+    if f then f:close() end
+    vim.list_extend(paths, { git_dir .. "/config", git_dir .. "/hooks", git_dir .. "/lazygit.yml" })
+    if vim.uv.fs_stat(git_dir .. "/config.worktree") then table.insert(paths, git_dir .. "/config.worktree") end
+    -- core.hooksPath が作業ツリーの中（.husky など）なら、そこも
+    local out = vim.system({ "git", "-C", p.git_root, "config", "core.hooksPath" }, { text = true }):wait()
+    local hooks = out.code == 0 and vim.fn.expand(vim.trim(out.stdout)) or ""
+    if hooks ~= "" then
+      if hooks:sub(1, 1) ~= "/" then hooks = p.git_root .. "/" .. hooks end
+      hooks = vim.fs.normalize(hooks)
+      if vim.startswith(hooks, p.git_root .. "/") then
+        vim.fn.mkdir(hooks, "p")
+        table.insert(paths, hooks)
+      end
+    end
+  end
+  for _, path in ipairs({ p.root .. "/.devcontainer", p.root .. "/.devcontainer.json" }) do
+    if vim.uv.fs_stat(path) then table.insert(paths, path) end
+  end
+  return paths
+end
+
 --- 元の devcontainer.json に、手元と同じ絶対パスでマウントする設定を足した上書き用設定を作る
 ---@param p devcontainer.Project
 ---@param cb fun(path?: string, err?: string)
@@ -74,6 +108,10 @@ function M.write_override(p, cb)
       end
       config.workspaceMount = ("type=bind,source=%s,target=%s,consistency=cached"):format(p.git_root, p.git_root)
       config.workspaceFolder = p.root
+      config.mounts = config.mounts or {}
+      for _, path in ipairs(M.protected_paths(p)) do
+        table.insert(config.mounts, ("type=bind,source=%s,target=%s,readonly"):format(path, path))
+      end
       for _, hook in ipairs(require("devcontainer").override_hooks) do
         hook(config, p)
       end
@@ -136,13 +174,19 @@ function M.has_same_path_mount(p, cb)
   run(p, { "docker", "inspect", "--format", "{{json .Mounts}}", p.container_id }, nil, function(code, stdout)
     local ok, mounts = pcall(vim.json.decode, stdout)
     if code ~= 0 or not ok then return cb(false) end
+    -- マウント先 → 読み取り専用であるべきか
     local want = {
-      [p.git_root] = true,
-      [require("devcontainer.tools").dir] = true,
-      [require("devcontainer.tools").claude_dir] = true,
+      [p.git_root] = false,
+      [require("devcontainer.tools").dir] = false,
+      [require("devcontainer.tools").claude_dir] = false,
     }
+    for _, path in ipairs(M.protected_paths(p)) do
+      want[path] = true
+    end
     for _, m in ipairs(mounts) do
-      want[m.Destination] = nil
+      if want[m.Destination] ~= nil and (not want[m.Destination] or m.RW == false) then
+        want[m.Destination] = nil
+      end
     end
     cb(next(want) == nil)
   end)

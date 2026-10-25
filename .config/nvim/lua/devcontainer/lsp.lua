@@ -52,12 +52,14 @@ function M.stop(p, cb)
   local stopping = {}
   for id, root in pairs(clients) do
     if root == p.root then
+      -- 終了するまでは表に残し、手元のクライアントとして使い回されないようにする
       local client = vim.lsp.get_client_by_id(id)
       if client then
         client:stop()
         table.insert(stopping, client)
+      else
+        clients[id] = nil
       end
-      clients[id] = nil
     end
   end
   if not cb then return end
@@ -165,6 +167,26 @@ local function to_container(p, config)
   return config
 end
 
+--- 既定の使い回しの判定（vim.lsp.start の既定に合わせ、名前と root が同じなら使い回す）
+---@param client vim.lsp.Client
+---@param config vim.lsp.ClientConfig
+local function same_root(client, config)
+  return client.name == config.name and not client:is_stopped() and client.root_dir == config.root_dir
+end
+
+--- 持ち主（コンテナのプロジェクトのルート、手元なら nil）が同じクライアントだけを使い回す。
+--- 既定の判定は名前と root しか見ないので、同じ root の手元とコンテナのクライアントが混ざる
+---@param opts vim.lsp.start.Opts
+---@param owner? string
+local function with_owner(opts, owner)
+  local inner = opts.reuse_client or same_root
+  return vim.tbl_extend("force", opts, {
+    reuse_client = function(client, config)
+      return clients[client.id] == owner and inner(client, config)
+    end,
+  })
+end
+
 function M.setup()
   local start = vim.lsp.start
   ---@diagnostic disable-next-line: duplicate-set-field
@@ -173,16 +195,21 @@ function M.setup()
     if host_only[config.name] then return start(config, opts) end
     local bufnr = opts.bufnr and opts.bufnr ~= 0 and opts.bufnr or vim.api.nvim_get_current_buf()
     local root = project.root_for_buf(bufnr)
-    if not root then return start(config, opts) end
+    if not root then return start(config, with_owner(opts, nil)) end
 
     -- 起動するか未回答、またはコンテナの準備ができるまでは何も起動しない（L3, C9）
     local p = project.get(root)
-    if p.mode == "host" then return start(config, opts) end
+    if p.mode == "host" then return start(config, with_owner(opts, nil)) end
     if p.mode ~= "container" or p.status ~= "ready" then return end
 
+    -- root_markers の設定は vim.lsp.start の中で root を決めるので、cwd や node_modules を探す前に同じく決めておく
+    if not config.root_dir and opts._root_markers then
+      config = vim.deepcopy(config)
+      config.root_dir = vim.fs.root(bufnr, opts._root_markers)
+    end
     local c = to_container(p, config)
     if not c then return end
-    local id = start(c, opts)
+    local id = start(c, with_owner(opts, p.root))
     if id then clients[id] = p.root end
     return id
   end

@@ -18,7 +18,7 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 | C5 | `devcontainer.json` のあるプロジェクトを開くと起動するか確認する。選択肢は「起動する / 常に起動する / 今回は使わない / このプロジェクトでは使わない」。「常に」と「使わない」はプロジェクトごとに state ディレクトリへ保存し、`:DevcontainerForget` で消せる |
 | C6 | ビルドは非同期で行い、進み具合を通知する。ログは `:DevcontainerLog` で見られる |
 | C7 | Neovim を閉じてもコンテナは止めない |
-| C8 | 止まっているコンテナは再開する。`devcontainer.json` が前回の起動時から変わっていたら作り直すか確認する |
+| C8 | 止まっているコンテナは再開する。`devcontainer.json` が前回の起動時から変わっていたら作り直すか確認する。「そのまま起動する」を選んだら、作り直すまで次回も確認する |
 | C9 | 起動に失敗したら通知してログを開く。LSP は手元にフォールバックせず、起動しないまま |
 
 ### LSP
@@ -46,10 +46,10 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 | # | 決定 |
 | --- | --- |
 | A1 | Claude Code は名前付きボリュームに入れ、全コンテナで共有する。Neovim 内のターミナルで、コンテナ内の Claude を使う |
-| A2 | 認証はコンテナ内で一度ログインし、ボリュームに保存する。ホストの `~/.claude` はマウントしない |
+| A2 | 認証はコンテナ内で一度ログインし、ボリュームに保存する。ホストの `~/.claude` はマウントしない。全コンテナで共有するのはログインだけで、Claude の設定や履歴はプロジェクトごとに分ける（あるプロジェクトで仕込まれた hooks や MCP サーバーが、他のプロジェクトで動かないように） |
 | A3 | settings.json・skills・agents・CLAUDE.md はコンテナ作成時にホストからコピーする。`:DevcontainerSyncClaude` で再同期できる |
 | A4 | devcontainer プロジェクトでは、ホストの Claude（claudecode.nvim の `<leader>ac` など）を起動できないようにする |
-| A5 | エージェントに任せるモードでは、sudo を使えない専用ユーザーで Claude を動かす。通信は、プラグインが root として外から設定した許可リストの宛先にだけ制限する。普段は制限しない |
+| A5 | エージェントに任せるモードでは、sudo を使えない専用ユーザーで Claude を動かす。エージェントが動いている間は、コンテナ全体（uid を問わない）の通信を、プラグインが root として外から設定した許可リストの宛先にだけ制限する。エージェントが終了したら外す。普段は制限しない |
 
 ### git
 
@@ -104,22 +104,29 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 
 決定事項を実装に落とすときに決めたこと。
 
-- **ボリューム**: `nvim-devcontainer-tools`（`/opt/nvim-dc`、読み取り専用でマウント）と `nvim-devcontainer-claude`（`/opt/nvim-dc-claude`）。ツールは `node:22-slim`（musl のイメージなら `node:22-alpine`）のヘルパーコンテナから入れる。中身は手元の mason の npm パッケージと同じバージョンに `typescript@5` と Claude Code を足したもの。一覧が変わったら入れ直す。ボリュームの無い既存コンテナは、同じパスのマウントが無いときと同じく作り直すか確認する
+- **ボリューム**: `nvim-devcontainer-tools`（`/opt/nvim-dc`、読み取り専用でマウント）と `nvim-devcontainer-claude`（`/opt/nvim-dc-claude`）。ツールは `node:22-slim`（musl のイメージなら `node:22-alpine`）のヘルパーコンテナから入れる。中身は手元の mason の npm パッケージと同じバージョンに `typescript@5` と Claude Code を足したもの。一覧が変わったら入れ直す。入れ直しはバージョンごとのディレクトリ（`/opt/nvim-dc/glibc.<stamp>`）に入れてシンボリックリンクで切り替え、直前のバージョンは残す（他のコンテナで動いている LSP が使っているため）。ボリュームの無い既存コンテナは、同じパスのマウントが無いときと同じく作り直すか確認する
 - **LSP**: `vim.lsp.start` を包んで、`docker exec -i` 経由の cmd に差し替える。コンテナから見えない手元の PID で LSP が終了しないよう、`processId` は送らない。cmd が関数の lspconfig 設定（ts_ls など）は、関数版と同じく `node_modules/.bin` を優先する。コマンドがコンテナに無ければ（mason の npm 以外の LSP や `elm` など）警告して起動しない（L6）
 - **確認**: C5 の確認を閉じたら未回答のままにする。答えるまではプロジェクトの LSP もホストの Claude も起動しない（`:DevcontainerUp` で起動できる）
 - **ツールの更新**: インストールは 15 分で打ち切る。ツールのボリュームは読み取り専用なので、Claude Code の自動更新は止めている
 - **TypeScript**: プロジェクトの `node_modules/typescript` があればそれを、無ければボリュームの `typescript@5` を使う（TypeScript 7 には `tsserver.js` が無い）
-- **Claude の認証**: 設定は `CLAUDE_CONFIG_DIR=/opt/nvim-dc-claude/config`。認証ファイルは 0600 なので、開くたびにそのコンテナのユーザーへ持ち主を合わせる
-- **エージェント**: 専用ユーザーは `nvim-agent`。sudo が使えたら中止する。認証は普段の設定から `/opt/nvim-dc-claude/agent` へコピーし、トークンは新しい方を両方向に取り込む。`--dangerously-skip-permissions` で起動する
-- **通信制限**: `nvim-agent` の uid の OUTPUT だけを、ループバック・DNS・許可リストの宛先に制限する（IPv6 は DNS 以外すべて拒否）。宛先は起動のたびに引き直す。既定は Anthropic の API と認証・テレメトリの宛先で、`vim.g.devcontainer_agent_allowlist` で足せる。ルールを設定できなければ起動しない
+- **Claude の認証**: 設定はプロジェクトごとに `CLAUDE_CONFIG_DIR=/opt/nvim-dc-claude/projects/<ルートの sha256 の先頭 16 文字>/config`。共有のログインは `/opt/nvim-dc-claude/auth`（root だけが読み書きする）に置き、開くたびに新しい方の `.credentials.json` を両方向に取り込む（どこかで `/login` すれば全プロジェクトに行き渡る）。新しいプロジェクトの `.claude.json` には、アカウントと初回設定の項目（`oauthAccount` など）だけを引き継ぐ。シンボリックリンクは読まない。以前の `/opt/nvim-dc-claude/config` のログインは初回に `auth` へ移す（旧ディレクトリは残るので、不要なら消してよい）。共有するログイン自体は、どのプロジェクトのコンテナからも読み書きできるので、トークンの窃取やすり替えは防げない
+- **エージェント**: 専用ユーザーは `nvim-agent`。sudo が使えたら中止する。認証はそのプロジェクトの普段の設定から `/opt/nvim-dc-claude/projects/<…>/agent` へコピーし、トークンは普段の設定の方が新しければ取り込む。逆向き（エージェント → 普段）は取り込まない（エージェントが別のアカウントのトークンにすり替えられるため）。エージェントのセッション中にトークンが更新されると、普段の Claude で `/login` し直しが必要になることがある。`--dangerously-skip-permissions` で起動する
+- **通信制限**: エージェントの起動中はコンテナ全体の OUTPUT を、ループバック・コンテナの DNS サーバー（`/etc/resolv.conf`）・許可リストの宛先に制限する（IPv6 も同様）。宛先は起動のたびに引き直す。既定は Anthropic の API と認証の宛先で、誰でも送れるテレメトリの宛先（statsig.com・sentry.io）は持ち出しに使えるので入れず、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` で止める。`vim.g.devcontainer_agent_allowlist` で足せる。ルールを設定できなければ起動しない。`nvim-agent` の uid だけに掛けると、エージェントが書いたファイル（`eslint.config.js` や `node_modules/.bin` など）を普段のユーザーや LSP が実行して抜けられるため、全体に掛ける。チェーンは `iptables-restore` で一度に入れ替え、引き直しの途中で制限が外れないようにする。エージェントのターミナルが終了したとき（と Neovim を閉じるとき）に、`nvim-agent` のプロセスをすべて止めてから制限を外す（`docker exec` が切れてもコンテナ内のプロセスは残ることがあるため）。止められなければ制限を残す。Neovim が異常終了したときは、次にエージェントを開いて終了するか、コンテナを再起動するまで制限が残る。エージェントの終了後に、エージェントが書いたファイルを実行すると制限は掛からない
+- **ホストの保護**: プロジェクトのマウントは書き込めるので、ホストで実行されるファイルは読み取り専用で重ねてマウントする。`.git/config`・`.git/config.worktree`・`.git/hooks`・`.git/lazygit.yml`・作業ツリー内の `core.hooksPath`（`.husky` など）・`.devcontainer` / `.devcontainer.json`。無いものは先に手元で作る（コンテナ内で作られないように）。既存コンテナにこれらが無ければ作り直すか確認する。コンテナ内では `git config`（リポジトリの設定）は書けないが、commit はできる。防げないもの: `initializeCommand` が作業ツリーのスクリプトを呼ぶ場合、`include.path` で作業ツリーのファイルを読む場合、ホストで作業ツリーのファイルを実行する他のツール（mise の設定など）
 - **git**: `safe.directory=*` を system に設定する（マウントしたファイルの持ち主がコンテナのユーザーと違って見えるため）
 
 ## 検証
 
 `node:22-bookworm` のテスト用コンテナ（colima, aarch64）で確認した。
 
+- コンテナ内の root から `.git/config`・hooks・`.husky`・`.devcontainer` に書き込めず、commit はできること。手元で `.git/config` を書き換えるとコンテナからも見えること
+- `ClaudeCodeAdd` / `ClaudeCodeSend` / `ClaudeCodeTreeAdd` でもホストの Claude が起動しないこと
+- 同じ root でも、手元とコンテナの LSP クライアントが使い回されないこと。`root_markers` で root を決める LSP（cssls など）が、その root で動くこと
+- 共有のログインの移行・プロジェクト間の伝播、シンボリックリンクを読まないこと、`mcpServers` などが引き継がれないこと、`nvim-agent` から読めないこと
+- エージェント用の設定を root がコピーするとき、`nvim-agent` が置いたシンボリックリンクをたどらないこと
+- ツールの入れ直しで、旧構成（実ディレクトリ）から移行し、直前のバージョンが残ること
 - C5 の確認の各選択肢・閉じたとき、`:DevcontainerForget` / `Up` / `Stop` / `Rebuild`（LSP の終了とつなぎ直し）
 - コンテナのシェル（起動待ちを含む）、ホストのシェル、ターミナルモードからの `<C-/>`
 - ts_ls・vue_ls などがコンテナ内で動き診断を返すこと、起動前・確認前は LSP が動かないこと、Copilot は手元のまま
 - Claude の設定と git の名前・メールのコピー、ホストの Claude の封鎖
-- コンテナ内で `/login` した本物の認証で、`nvim-agent` の Claude が許可リスト内の API に応答し、許可リスト外（example.com）には繋がらないこと。普段のユーザーは制限されないこと
+- コンテナ内で `/login` した本物の認証で、`nvim-agent` の Claude が許可リスト内の API に応答し、許可リスト外（example.com）や DNS サーバー以外の 53 番には繋がらないこと。起動中は root や普段のユーザーも制限され、終了後は `nvim-agent` のプロセスが止まって制限が外れること。引き直しても重複しないこと
