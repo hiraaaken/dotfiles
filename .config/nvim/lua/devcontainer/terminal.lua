@@ -7,7 +7,8 @@ local function notify(msg, level)
   vim.notify(msg, level or vim.log.levels.INFO, { title = "devcontainer" })
 end
 
---- コンテナ内でログインシェルを起動するコマンド（zsh → bash → sh の順で探す）
+--- コンテナ内でログインシェルを起動するコマンド（zsh → bash → sh の順で探す）。
+--- プロジェクトの node_modules/.bin（vp など）をそのまま使えるよう、PATH の先頭に足す
 ---@param p devcontainer.Project
 function M.container_cmd(p)
   return {
@@ -15,7 +16,7 @@ function M.container_cmd(p)
     "-w", p.root,
     "-u", p.remote_user or "root",
     p.container_id,
-    "sh", "-c", "exec $(command -v zsh || command -v bash || echo sh) -l",
+    "sh", "-c", 'PATH="$1/node_modules/.bin:$PATH" exec $(command -v zsh || command -v bash || echo sh) -l', "sh", p.root,
   }
 end
 
