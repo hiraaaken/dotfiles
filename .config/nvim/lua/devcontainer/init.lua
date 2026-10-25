@@ -67,10 +67,10 @@ function M.start(p, opts)
   if p.status == "starting" then return end
   p.mode = "container"
   p.commands = nil
-  lsp.stop(p)
   set_status(p, "starting")
   notify(("%s のコンテナを起動しています…"):format(name(p)))
-  cli.up(p, opts, function(ok, err)
+  -- 作り直すとコンテナごと消えるので、先に LSP を終了させておく
+  lsp.stop(p, function() cli.up(p, opts, function(ok, err)
     if not ok and err == "mount_mismatch" then
       set_status(p, "failed")
       vim.ui.select({ "作り直す", "やめる" }, {
@@ -99,7 +99,7 @@ function M.start(p, opts)
         lsp.retrigger(p)
       end)
     end)
-  end)
+  end) end)
 end
 
 --- 前回起動時から設定が変わっていたら作り直すか確認してから起動する
@@ -240,11 +240,14 @@ function M.setup()
     DevcontainerUp = function(p) start_checked(p) end,
     DevcontainerRebuild = function(p) M.start(p, { rebuild = true }) end,
     DevcontainerStop = function(p)
-      cli.stop(p, function(ok)
-        if ok then
-          set_status(p, "stopped")
-          notify(("%s のコンテナを止めました"):format(name(p)))
-        end
+      -- 先に LSP を終了させておかないと、コンテナごと強制終了されて異常終了の通知が並ぶ
+      lsp.stop(p, function()
+        cli.stop(p, function(ok)
+          if ok then
+            set_status(p, "stopped")
+            notify(("%s のコンテナを止めました"):format(name(p)))
+          end
+        end)
       end)
     end,
     DevcontainerLog = function(p) M.show_log(p) end,

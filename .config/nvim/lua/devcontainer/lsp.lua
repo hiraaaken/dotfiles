@@ -45,15 +45,29 @@ function M.retrigger(p)
   end
 end
 
+--- プロジェクトの LSP を正常に終了させる。cb は終わったら（最大 3 秒待って）呼ぶ
 ---@param p devcontainer.Project
-function M.stop(p)
+---@param cb? fun()
+function M.stop(p, cb)
+  local stopping = {}
   for id, root in pairs(clients) do
     if root == p.root then
       local client = vim.lsp.get_client_by_id(id)
-      if client then client:stop(true) end
+      if client then
+        client:stop()
+        table.insert(stopping, client)
+      end
       clients[id] = nil
     end
   end
+  if not cb then return end
+  local deadline = vim.uv.now() + 3000
+  local function check()
+    local done = vim.iter(stopping):all(function(c) return c:is_stopped() end)
+    if done or vim.uv.now() > deadline then return cb() end
+    vim.defer_fn(check, 100)
+  end
+  check()
 end
 
 --- コンテナ内にコマンドがあるか（結果はプロジェクトごとに覚える。未確認なら確認を始めて nil）
