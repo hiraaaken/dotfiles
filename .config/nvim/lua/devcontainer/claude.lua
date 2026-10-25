@@ -158,7 +158,7 @@ function M.open(p, args)
   tools.exec(p, "root", { "sh", "-c", script }, function()
     -- --resume などの引数ごとに一つ。開いていればそれを表示する
     local key = ("claude:%s:%s"):format(p.root, table.concat(args or {}, " "))
-    require("devcontainer.terminal").open({ cmd = cmd, cwd = p.root, name = "claude", key = key })
+    require("devcontainer.terminal").open({ cmd = cmd, cwd = p.root, name = "claude", key = key, root = p.root })
   end)
 end
 

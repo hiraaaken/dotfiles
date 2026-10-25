@@ -81,7 +81,8 @@ function M.stop(p, cb)
   if not cb then return end
   local deadline = vim.uv.now() + 3000
   local function check()
-    local done = vim.iter(stopping):all(function(c) return c:is_stopped() end)
+    -- is_stopped() は停止を頼んだ直後から true になるので、プロセスが終わってクライアントが消えるのを待つ
+    local done = vim.iter(stopping):all(function(c) return vim.lsp.get_client_by_id(c.id) == nil end)
     if done or vim.uv.now() > deadline then return cb() end
     vim.defer_fn(check, 100)
   end

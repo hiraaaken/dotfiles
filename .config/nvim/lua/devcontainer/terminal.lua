@@ -17,6 +17,7 @@ end
 ---@field cwd string
 ---@field name string ペインの上の一覧に出す名前
 ---@field key? string 同じ key のターミナルがあれば、新しく開かずにそれを使う
+---@field root? string コンテナのプロジェクトのルート（コンテナを止めるときに一緒に閉じる）
 ---@field on_exit? fun(code: integer)
 
 local count = 0
@@ -100,7 +101,7 @@ local function spawn(win, spec)
   vim.bo[buf].bufhidden = "hide"
   vim.api.nvim_win_set_buf(win, buf)
   count = count + 1
-  vim.b[buf].devcontainer_term = { n = count, name = spec.name, key = spec.key }
+  vim.b[buf].devcontainer_term = { n = count, name = spec.name, key = spec.key, root = spec.root }
   vim.api.nvim_win_call(win, function()
     vim.fn.jobstart(spec.cmd, {
       term = true,
@@ -193,7 +194,7 @@ end
 ---@param key? string
 ---@return devcontainer.TermSpec
 local function container_spec(p, key)
-  return { cmd = M.container_cmd(p), cwd = p.root, name = "shell", key = key }
+  return { cmd = M.container_cmd(p), cwd = p.root, name = "shell", key = key, root = p.root }
 end
 
 ---@param key? string
@@ -265,6 +266,17 @@ function M.close()
   if vim.b[buf].devcontainer_term == nil then return end
   if alive(buf) then vim.fn.jobstop(vim.b[buf].terminal_job_id) end
   remove(buf)
+end
+
+--- コンテナのプロジェクトのターミナルをすべて閉じる（コンテナを止める・作り直すとき）
+---@param root string
+function M.close_project(root)
+  for _, buf in ipairs(terms()) do
+    if vim.b[buf].devcontainer_term.root == root then
+      if alive(buf) then vim.fn.jobstop(vim.b[buf].terminal_job_id) end
+      remove(buf)
+    end
+  end
 end
 
 --- ペインを閉じる（ターミナルは裏で動き続ける）

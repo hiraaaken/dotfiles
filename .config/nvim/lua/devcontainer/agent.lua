@@ -227,7 +227,13 @@ function M.open(p)
               cwd = p.root,
               name = "agent",
               key = "agent:" .. p.root,
+              root = p.root,
               on_exit = function()
+                -- コンテナを止める・作り直すときは、ネットワークごと消えるので外さなくてよい
+                if p.stopping then
+                  p.agent_active = nil
+                  return
+                end
                 M.lift_firewall(p, function(lifted)
                   if lifted then notify("エージェントが終了したので、通信の制限を外しました") end
                 end)

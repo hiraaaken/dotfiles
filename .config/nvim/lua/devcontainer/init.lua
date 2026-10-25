@@ -48,7 +48,10 @@ end
 
 local function set_status(p, status)
   p.status = status
-  if status ~= "starting" then p.phase = nil end
+  if status ~= "starting" then
+    p.phase = nil
+    p.stopping = nil
+  end
   vim.cmd.redrawstatus({ bang = true })
   if status == "ready" then
     for _, fn in ipairs(waiters[p.root] or {}) do fn(p) end
@@ -70,6 +73,11 @@ function M.start(p, opts)
   -- 作り直しや再開でネットワークも作り直されるので、エージェント用の制限は消える
   p.agent_active = nil
   set_status(p, "starting")
+  if opts.rebuild then
+    -- 作り直すとコンテナの中のターミナルも終わるので、先に閉じておく
+    p.stopping = true
+    require("devcontainer.terminal").close_project(p.root)
+  end
   notify(("%s のコンテナを起動しています…"):format(name(p)))
   -- 作り直すとコンテナごと消えるので、先に LSP を終了させておく
   lsp.stop(p, function() cli.up(p, opts, function(ok, err)
@@ -119,6 +127,31 @@ local function start_checked(p)
   else
     M.start(p)
   end
+end
+
+--- コンテナを止める。先にそのプロジェクトのターミナルを閉じ、LSP を正常に終了させる
+--- （LSP を先に終了させないと、コンテナごと強制終了されて異常終了の通知が並ぶ）
+---@param p devcontainer.Project
+---@param cb fun(ok: boolean)
+local function stop(p, cb)
+  if not p.container_id or p.status ~= "ready" then
+    notify(("%s のコンテナは起動していません"):format(name(p)), vim.log.levels.WARN)
+    return cb(false)
+  end
+  p.stopping = true
+  require("devcontainer.terminal").close_project(p.root)
+  lsp.stop(p, function()
+    cli.stop(p, function(ok)
+      p.stopping = nil
+      if ok then
+        p.agent_active = nil
+        set_status(p, "stopped")
+      else
+        notify(("%s のコンテナを止められませんでした（:DevcontainerLog）"):format(name(p)), vim.log.levels.ERROR)
+      end
+      cb(ok)
+    end)
+  end)
 end
 
 local asked = {}
@@ -249,15 +282,13 @@ function M.setup()
     DevcontainerUp = function(p) start_checked(p) end,
     DevcontainerRebuild = function(p) M.start(p, { rebuild = true }) end,
     DevcontainerStop = function(p)
-      -- 先に LSP を終了させておかないと、コンテナごと強制終了されて異常終了の通知が並ぶ
-      lsp.stop(p, function()
-        cli.stop(p, function(ok)
-          if ok then
-            p.agent_active = nil
-            set_status(p, "stopped")
-            notify(("%s のコンテナを止めました"):format(name(p)))
-          end
-        end)
+      stop(p, function(ok)
+        if ok then notify(("%s のコンテナを止めました"):format(name(p))) end
+      end)
+    end,
+    DevcontainerRestart = function(p)
+      stop(p, function(ok)
+        if ok then start_checked(p) end
       end)
     end,
     DevcontainerLog = function(p) M.show_log(p) end,

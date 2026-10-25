@@ -15,6 +15,7 @@ local store_path = state_dir .. "/projects.json"
 ---@field log string[]
 ---@field phase? string 起動中の進み具合
 ---@field agent_active? boolean エージェントのためにコンテナ全体の通信を制限している
+---@field stopping? boolean コンテナを止めている、または作り直している途中
 
 ---@type table<string, devcontainer.Project>
 M.projects = {}
