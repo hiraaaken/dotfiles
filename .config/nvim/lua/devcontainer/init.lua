@@ -4,6 +4,7 @@ local cli = require("devcontainer.cli")
 local tools = require("devcontainer.tools")
 local lsp = require("devcontainer.lsp")
 local claude = require("devcontainer.claude")
+local node_modules = require("devcontainer.node_modules")
 
 local M = {}
 
@@ -12,7 +13,7 @@ M.enabled = false
 
 --- 上書き用設定を書き出す直前に呼ばれるフック（後段のモジュールが runArgs などを足す）
 ---@type fun(config: table, p: devcontainer.Project)[]
-M.override_hooks = { tools.add_mounts }
+M.override_hooks = { tools.add_mounts, node_modules.add_mount }
 
 local function notify(msg, level)
   vim.notify(msg, level or vim.log.levels.INFO, { title = "devcontainer" })
@@ -70,6 +71,7 @@ function M.start(p, opts)
   if p.status == "starting" then return end
   p.mode = "container"
   p.commands = nil
+  p.resolved = nil
   -- 作り直しや再開でネットワークも作り直されるので、エージェント用の制限は消える
   p.agent_active = nil
   set_status(p, "starting")
@@ -84,7 +86,7 @@ function M.start(p, opts)
     if not ok and err == "mount_mismatch" then
       set_status(p, "failed")
       vim.ui.select({ "作り直す", "やめる" }, {
-        prompt = ("%s の既存コンテナには、手元と同じパス・ツールのボリューム・.git などの保護がマウントされていません"):format(name(p)),
+        prompt = ("%s の既存コンテナには、手元と同じパス・ツールや node_modules のボリューム・.git などの保護がマウントされていません"):format(name(p)),
       }, function(choice)
         if choice == "作り直す" then M.start(p, { rebuild = true }) end
       end)
@@ -106,6 +108,7 @@ function M.start(p, opts)
       claude.on_container_created(p, function()
         set_status(p, "ready")
         notify(("%s のコンテナが起動しました"):format(name(p)))
+        node_modules.on_ready(p)
         lsp.retrigger(p)
         -- 右にコンテナのシェルを開いておく（vim.g.devcontainer_auto_terminal = false で開かない）
         if vim.g.devcontainer_auto_terminal ~= false then require("devcontainer.terminal").open_beside(p) end

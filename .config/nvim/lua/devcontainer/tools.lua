@@ -12,6 +12,7 @@ M.claude_volume = "nvim-devcontainer-claude"
 M.claude_dir = "/opt/nvim-dc-claude"
 
 local helper_images = { glibc = "node:22-slim", musl = "node:22-alpine" }
+M.helper_images = helper_images
 
 --- 上書き設定にボリュームのマウントを足す（C4 の override_hooks から呼ばれる）
 ---@param config table

@@ -25,7 +25,10 @@ local function_cmds = {
   oxfmt = { "oxfmt", "--lsp" },
 }
 
---- プロジェクトの node_modules にあるコマンド。Vite+ は oxfmt などを依存として持つが、
+--- プロジェクトの node_modules から探すコマンド
+local project_cmds = vim.tbl_map(function(c) return c[1] end, vim.tbl_values(function_cmds))
+
+--- プロジェクトの node_modules にあるコマンド（手元で動かす LSP 用。コンテナでは node_modules.resolve で探す）。Vite+ は oxfmt などを依存として持つが、
 --- pnpm だと node_modules/.bin に置かれないので、vite-plus の実体の隣も探す
 ---@param root string
 ---@param name string
@@ -136,6 +139,11 @@ end
 ---@param config vim.lsp.ClientConfig
 ---@return vim.lsp.ClientConfig?
 local function to_container(p, config)
+  -- node_modules はコンテナの中にしかないので、コンテナで探す
+  local found = require("devcontainer.node_modules").resolve(p, config.root_dir or p.root, project_cmds, function()
+    M.retrigger(p)
+  end)
+  if not found then return end
   local host_cmd = config.cmd
   if type(host_cmd) ~= "table" then
     host_cmd = function_cmds[config.name] and vim.deepcopy(function_cmds[config.name])
@@ -143,7 +151,7 @@ local function to_container(p, config)
       warn_once(p.root .. config.name, ("%s は cmd が関数のため、コンテナでは起動しません"):format(config.name))
       return
     end
-    host_cmd[1] = project_bin(config.root_dir or p.root, host_cmd[1]) or host_cmd[1]
+    host_cmd[1] = found[host_cmd[1]] or host_cmd[1]
   end
   local bin = host_cmd[1]:sub(1, 1) == "/" and vim.startswith(host_cmd[1], p.git_root) and host_cmd[1]
     or vim.fs.basename(host_cmd[1])
@@ -167,8 +175,7 @@ local function to_container(p, config)
   config.settings = rewrite_paths(p, config.settings)
 
   -- プロジェクトの TypeScript があればそちらを、無ければボリュームのものを使う（L5）
-  local tsserver = (config.root_dir or p.root) .. "/node_modules/typescript/lib"
-  if not vim.uv.fs_stat(tsserver) then tsserver = tools.prefix(p) .. "/npm/lib/node_modules/typescript/lib" end
+  local tsserver = found.typescript or tools.prefix(p) .. "/npm/lib/node_modules/typescript/lib"
   if config.name == "ts_ls" then
     config.init_options = config.init_options or {}
     config.init_options.tsserver = vim.tbl_extend("force", config.init_options.tsserver or {}, { path = tsserver })

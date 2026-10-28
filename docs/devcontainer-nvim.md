@@ -54,6 +54,14 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 | A4 | devcontainer プロジェクトでは、ホストの Claude（claudecode.nvim の `<leader>ac` など）を起動できないようにする |
 | A5 | エージェントに任せるモードでは、sudo を使えない専用ユーザーで Claude を動かす。エージェントが動いている間は、コンテナ全体（uid を問わない）の通信を、プラグインが root として外から設定した許可リストの宛先にだけ制限する。エージェントが終了したら外す。普段は制限しない |
 
+### node_modules
+
+| # | 決定 |
+| --- | --- |
+| N1 | 手元に node_modules が無ければ（または空なら）、プロジェクトごとの名前付きボリュームを node_modules に重ね、手元には作らない（コンテナ用の Linux のバイナリが手元に入らないように） |
+| N2 | 手元に node_modules があれば（手元でも開発するプロジェクト）、今までどおりそれをコンテナと共有する |
+| N3 | ボリュームのときは、依存の解決をコンテナの LSP に任せ、定義へ飛んだ先などの node_modules のファイルはコンテナから読む（読み取り専用） |
+
 ### git
 
 | # | 決定 |
@@ -106,6 +114,7 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 | M3 | LSP をコンテナで動かす（L1〜L6） | `lsp.lua` `tools.lua` |
 | M4 | コンテナ内の Claude（A1〜A4, G2） | `claude.lua` `tools.lua` |
 | M5 | エージェントに任せるモード（A5） | `agent.lua` |
+| M6 | node_modules をコンテナの中だけに置く（N1〜N3） | `node_modules.lua` |
 
 ## 実装メモ
 
@@ -119,6 +128,7 @@ VS Code の Dev Containers のように、編集は手元の Neovim で行い、
 - **Claude の認証**: 設定はプロジェクトごとに `CLAUDE_CONFIG_DIR=/opt/nvim-dc-claude/projects/<ルートの sha256 の先頭 16 文字>/config`。共有のログインは `/opt/nvim-dc-claude/auth`（root だけが読み書きする）に置き、開くたびに新しい方の `.credentials.json` を両方向に取り込む（どこかで `/login` すれば全プロジェクトに行き渡る）。新しいプロジェクトの `.claude.json` には、アカウントと初回設定の項目（`oauthAccount` など）だけを引き継ぐ。シンボリックリンクは読まない。以前の `/opt/nvim-dc-claude/config` のログインは初回に `auth` へ移す（旧ディレクトリは残るので、不要なら消してよい）。共有するログイン自体は、どのプロジェクトのコンテナからも読み書きできるので、トークンの窃取やすり替えは防げない
 - **エージェント**: 専用ユーザーは `nvim-agent`。sudo が使えたら中止する。認証はそのプロジェクトの普段の設定から `/opt/nvim-dc-claude/projects/<…>/agent` へコピーし、トークンは普段の設定の方が新しければ取り込む。逆向き（エージェント → 普段）は取り込まない（エージェントが別のアカウントのトークンにすり替えられるため）。エージェントのセッション中にトークンが更新されると、普段の Claude で `/login` し直しが必要になることがある。`--dangerously-skip-permissions` で起動する
 - **通信制限**: エージェントの起動中はコンテナ全体の OUTPUT を、ループバック・コンテナの DNS サーバー（`/etc/resolv.conf`）・許可リストの宛先に制限する（IPv6 も同様）。宛先は起動のたびに引き直す。既定は Anthropic の API と認証の宛先で、誰でも送れるテレメトリの宛先（statsig.com・sentry.io）は持ち出しに使えるので入れず、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` で止める。`vim.g.devcontainer_agent_allowlist` で足せる。ルールを設定できなければ起動しない。`nvim-agent` の uid だけに掛けると、エージェントが書いたファイル（`eslint.config.js` や `node_modules/.bin` など）を普段のユーザーや LSP が実行して抜けられるため、全体に掛ける。チェーンは `iptables-restore` で一度に入れ替え、引き直しの途中で制限が外れないようにする。エージェントのターミナルが終了したとき（と Neovim を閉じるとき）に、`nvim-agent` のプロセスをすべて止めてから制限を外す（`docker exec` が切れてもコンテナ内のプロセスは残ることがあるため）。止められなければ制限を残す。Neovim が異常終了したときは、次にエージェントを開いて終了するか、コンテナを再起動するまで制限が残る。エージェントの終了後に、エージェントが書いたファイルを実行すると制限は掛からない
+- **node_modules**: ルートに `package.json` があり、手元の node_modules が無いか空なら、`nvim-devcontainer-nm-<ルートの sha256 の先頭 16 文字>` を重ねる。どちらにするかは起動のたびに手元の状態で決める（ボリュームを重ねたコンテナがあると、手元の node_modules は空のマウント先になるので変わらない）。手元の node_modules を消すと、次の起動で作り直すか確認する。ボリュームは作り直しても残す（入れ直しが速いように）。新しいボリュームは root の持ち物になり remoteUser の `pnpm install` が失敗するので、`up` の前にヘルパーコンテナでルートを 1777（スティッキー）にする。ライフサイクルコマンドの流れは変えない。LSP が使う `node_modules/.bin` のコマンドと TypeScript は、手元ではなくコンテナの中で探す（ロックファイルの更新時刻ごとに覚えるので、依存を入れ直すと探し直す）。node_modules 配下のファイルは `BufReadCmd` で `docker exec cat` して読み、書き込み・スワップ・アンドゥ・モードラインを止める。防げない・できないもの: 手元で commit すると、node_modules を使う git hooks（`vp staged` など）が動かない（commit はコンテナ内で）。pnpm workspace の `packages/*/node_modules` は手元に作られる（ルートだけが対象）。`nvim-agent` は node_modules に新しいファイルは作れるが、普段のユーザーが入れたものは書き換えられない
 - **ホストの保護**: プロジェクトのマウントは書き込めるので、ホストで実行されるファイルは読み取り専用で重ねてマウントする。`.git/config`・`.git/config.worktree`・`.git/hooks`・`.git/lazygit.yml`・作業ツリー内の `core.hooksPath`（`.husky` など）・`.devcontainer` / `.devcontainer.json`。無いものは先に手元で作る（コンテナ内で作られないように）。既存コンテナにこれらが無ければ作り直すか確認する。コンテナ内では `git config`（リポジトリの設定）は書けないが、commit はできる。防げないもの: `initializeCommand` が作業ツリーのスクリプトを呼ぶ場合、`include.path` で作業ツリーのファイルを読む場合、ホストで作業ツリーのファイルを実行する他のツール（mise の設定など）
 - **ターミナル**: コンテナのシェルは、プロジェクトの `node_modules/.bin` を `PATH` の先頭に足して開く（`vp` などをそのまま使えるように）。ペインに開くコマンドはすべて `TERM=xterm-256color`・`COLORTERM=truecolor` で動かす（`docker exec -it` は `TERM=xterm` にするので、色が減り Debian の bashrc もプロンプトに色を付けない）。シェルは `LANG` が無ければ `C.UTF-8` にする（日本語の入力が崩れないように）
 - **シェルの claude**: シェルごとにコンテナの一時ディレクトリを作り、ボリュームの `claude` へのリンクを置いて `PATH` の末尾に足す。ボリュームの `npm/bin` ごと足すと、LSP 用の `tsc` などがプロジェクトのツールに見えるので足さない。`CLAUDE_CONFIG_DIR` などは `<leader>ac` と同じものを渡し、シェルを新しく開く前に共有のログインを取り込む。エージェント用の設定は使わない

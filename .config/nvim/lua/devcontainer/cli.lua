@@ -132,28 +132,30 @@ end
 function M.up(p, opts, cb)
   M.write_override(p, function(override, err)
     if not override then return cb(false, err) end
-    local cmd = {
-      "devcontainer", "up",
-      "--workspace-folder", p.root,
-      "--override-config", override,
-      "--log-format", "json",
-    }
-    if opts.rebuild then table.insert(cmd, "--remove-existing-container") end
-    run(p, cmd, function(line) handle_json_log(p, line) end, function(code, stdout)
-      local result
-      for _, l in ipairs(vim.split(stdout, "\n", { trimempty = true })) do
-        local ok, r = pcall(vim.json.decode, l)
-        if ok and type(r) == "table" and r.outcome then result = r end
-      end
-      if code ~= 0 or not result or result.outcome ~= "success" then
-        return cb(false, result and result.message or ("devcontainer up が失敗しました (exit " .. code .. ")"))
-      end
-      p.container_id = result.containerId
-      p.remote_user = result.remoteUser
-      -- 以前に別の設定で作られたコンテナが使い回されると、同じパスのマウントが無い
-      M.has_same_path_mount(p, function(mounted)
-        if mounted then return cb(true) end
-        cb(false, "mount_mismatch")
+    require("devcontainer.node_modules").prepare(p, function()
+      local cmd = {
+        "devcontainer", "up",
+        "--workspace-folder", p.root,
+        "--override-config", override,
+        "--log-format", "json",
+      }
+      if opts.rebuild then table.insert(cmd, "--remove-existing-container") end
+      run(p, cmd, function(line) handle_json_log(p, line) end, function(code, stdout)
+        local result
+        for _, l in ipairs(vim.split(stdout, "\n", { trimempty = true })) do
+          local ok, r = pcall(vim.json.decode, l)
+          if ok and type(r) == "table" and r.outcome then result = r end
+        end
+        if code ~= 0 or not result or result.outcome ~= "success" then
+          return cb(false, result and result.message or ("devcontainer up が失敗しました (exit " .. code .. ")"))
+        end
+        p.container_id = result.containerId
+        p.remote_user = result.remoteUser
+        -- 以前に別の設定で作られたコンテナが使い回されると、同じパスのマウントが無い
+        M.has_same_path_mount(p, function(mounted)
+          if mounted then return cb(true) end
+          cb(false, "mount_mismatch")
+        end)
       end)
     end)
   end)
@@ -183,6 +185,11 @@ function M.has_same_path_mount(p, cb)
     for _, path in ipairs(M.protected_paths(p)) do
       want[path] = true
     end
+    local node_modules = require("devcontainer.node_modules").target(p)
+    if node_modules then want[node_modules] = false end
+    p.node_modules_volume = vim.iter(mounts):any(function(m)
+      return m.Destination == p.root .. "/node_modules" and m.Type == "volume"
+    end)
     for _, m in ipairs(mounts) do
       if want[m.Destination] ~= nil and (not want[m.Destination] or m.RW == false) then
         want[m.Destination] = nil
