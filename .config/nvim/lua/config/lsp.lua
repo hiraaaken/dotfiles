@@ -45,6 +45,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- oxfmt（Vite+ の整形）は mason で入れず、プロジェクトのものを使う。
 -- 起動するのは package.json などで oxfmt / vite-plus を使っているプロジェクトだけ（lspconfig の root_dir）
 vim.lsp.config("oxfmt", {
+  -- 使っていないプロジェクトでは root_dir が nil で呼ばれるので、起動しない
+  workspace_required = true,
   cmd = function(dispatchers, config)
     local bin = require("devcontainer.lsp").project_bin((config or {}).root_dir or vim.fn.getcwd(), "oxfmt")
     return vim.lsp.rpc.start({ bin or "oxfmt", "--lsp" }, dispatchers)

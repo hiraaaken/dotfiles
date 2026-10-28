@@ -230,6 +230,11 @@ function M.setup()
       config = vim.deepcopy(config)
       config.root_dir = vim.fs.root(bufnr, opts._root_markers)
     end
+    -- root が無ければ起動しない設定（vim.lsp.start と同じ判定）。コンテナでコマンドを探す前に除く
+    if config.workspace_required and not config.root_dir
+        and (not config.workspace_folders or #config.workspace_folders == 0) then
+      return
+    end
     local c = to_container(p, config)
     if not c then return end
     local id = start(c, with_owner(opts, p.root))
