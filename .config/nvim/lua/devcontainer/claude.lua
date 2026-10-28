@@ -26,6 +26,21 @@ function M.config_dir(p)
   return M.project_dir(p) .. "/config"
 end
 
+---@param p devcontainer.Project
+function M.bin(p)
+  return tools.prefix(p) .. "/npm/bin/claude"
+end
+
+--- 普段の Claude を動かすときの環境変数（<leader>ac とコンテナのシェルで共通）
+---@param p devcontainer.Project
+function M.env(p)
+  return {
+    "CLAUDE_CONFIG_DIR=" .. M.config_dir(p),
+    -- ボリュームは読み取り専用なので自分では更新できない
+    "DISABLE_AUTOUPDATER=1",
+  }
+end
+
 --- ホストからコピーするもの（A3）。認証や履歴はコピーしない
 local sync_items = { "settings.json", "CLAUDE.md", "skills", "agents" }
 
@@ -145,13 +160,7 @@ end
 ---@param args? string[]
 function M.open(p, args)
   local user = p.remote_user or "root"
-  local cmd = {
-    "docker", "exec", "-it", "-w", p.root, "-u", user,
-    "-e", "CLAUDE_CONFIG_DIR=" .. M.config_dir(p),
-    -- ボリュームは読み取り専用なので自分では更新できない
-    "-e", "DISABLE_AUTOUPDATER=1",
-    p.container_id, tools.prefix(p) .. "/npm/bin/claude",
-  }
+  local cmd = require("devcontainer.terminal").exec_cmd(p, user, M.env(p), { M.bin(p) })
   vim.list_extend(cmd, args or {})
   -- エージェント用（agent.lua）の認証は取り込まない（エージェントが別のアカウントにすり替えられるため）
   local script = M.sync_auth_script(p, user)

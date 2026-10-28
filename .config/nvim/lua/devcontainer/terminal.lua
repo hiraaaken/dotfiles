@@ -177,17 +177,49 @@ function M.open(spec, opts)
   return buf, true
 end
 
---- コンテナ内でログインシェルを起動するコマンド（zsh → bash → sh の順で探す）。
---- プロジェクトの node_modules/.bin（vp など）をそのまま使えるよう、PATH の先頭に足す
+--- ペインで動かすコンテナのコマンド。docker exec -it は TERM=xterm にするので、
+--- そのままだと色が 8 色になり、Debian の bashrc もプロンプトに色を付けない。ペインに合わせる
+---@param p devcontainer.Project
+---@param user string
+---@param env string[] "KEY=VALUE"
+---@param argv string[]
+function M.exec_cmd(p, user, env, argv)
+  local cmd = {
+    "docker", "exec", "-it", "-w", p.root, "-u", user,
+    "-e", "TERM=xterm-256color", "-e", "COLORTERM=truecolor",
+  }
+  for _, e in ipairs(env) do vim.list_extend(cmd, { "-e", e }) end
+  table.insert(cmd, p.container_id)
+  return vim.list_extend(cmd, argv)
+end
+
+local bashrc = vim.fs.joinpath(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)), "bashrc")
+
+--- コンテナのシェルを起動するスクリプト（zsh → bash → sh の順で探す）。
+--- 一時ディレクトリに claude へのリンクを置いて PATH の末尾に足し、シェルからも Claude を使えるようにする
+--- （ボリュームの npm/bin ごと足すと、LSP 用の tsc などがプロジェクトのツールに見えるので足さない）。
+--- プロジェクトの node_modules/.bin（vp など）は PATH の先頭に足す。
+--- bash は bashrc を rcfile にして、プロンプトを整える（zsh はイメージ側の設定に任せる）
+local launcher = [[
+d=$(mktemp -d)
+ln -s "$2" "$d/claude"
+export NVIM_DC_ROOT="$1" NVIM_DC_DIR="$d" LANG="${LANG:-C.UTF-8}"
+if command -v bash >/dev/null && ! command -v zsh >/dev/null; then
+  printf '%s\n' "$3" > "$d/bashrc"
+  exec bash --rcfile "$d/bashrc" -i
+fi
+export PATH="$1/node_modules/.bin:$PATH:$d"
+exec $(command -v zsh || echo sh) -l
+]]
+
+--- コンテナ内でシェルを起動するコマンド
 ---@param p devcontainer.Project
 function M.container_cmd(p)
-  return {
-    "docker", "exec", "-it",
-    "-w", p.root,
-    "-u", p.remote_user or "root",
-    p.container_id,
-    "sh", "-c", 'PATH="$1/node_modules/.bin:$PATH" exec $(command -v zsh || command -v bash || echo sh) -l', "sh", p.root,
-  }
+  local claude = require("devcontainer.claude")
+  local f = assert(io.open(bashrc, "r"))
+  local rc = f:read("*a")
+  f:close()
+  return M.exec_cmd(p, p.remote_user or "root", claude.env(p), { "sh", "-c", launcher, "sh", p.root, claude.bin(p), rc })
 end
 
 ---@param p devcontainer.Project
@@ -195,6 +227,18 @@ end
 ---@return devcontainer.TermSpec
 local function container_spec(p, key)
   return { cmd = M.container_cmd(p), cwd = p.root, name = "shell", key = key, root = p.root }
+end
+
+--- コンテナのシェルを開く。新しく開くときは、シェルの claude が使えるよう共有のログインを先に取り込む
+---@param p devcontainer.Project
+---@param key? string
+---@param opts? { focus?: boolean, new_window?: boolean }
+local function open_container(p, key, opts)
+  if key and find(key) then return M.open(container_spec(p, key), opts) end
+  local script = require("devcontainer.claude").sync_auth_script(p, p.remote_user or "root")
+  require("devcontainer.tools").exec(p, "root", { "sh", "-c", script }, function()
+    M.open(container_spec(p, key), opts)
+  end)
 end
 
 ---@param key? string
@@ -222,7 +266,7 @@ local function shell(new, opts)
   local p = current_project()
   if not p then return M.open(host_spec(not new and "host:" .. vim.fn.getcwd() or nil), opts) end
   require("devcontainer").when_ready(p, function()
-    M.open(container_spec(p, not new and "shell:" .. p.root or nil), opts)
+    open_container(p, not new and "shell:" .. p.root or nil, opts)
   end)
 end
 
@@ -241,13 +285,13 @@ end
 function M.container(p)
   p = p or current_project()
   if not p then return notify("devcontainer のプロジェクトではありません", vim.log.levels.WARN) end
-  require("devcontainer").when_ready(p, function() M.open(container_spec(p, "shell:" .. p.root)) end)
+  require("devcontainer").when_ready(p, function() open_container(p, "shell:" .. p.root) end)
 end
 
 --- コンテナの準備ができたときに、右にコンテナのシェルを開く。カーソルはエディタに残す
 ---@param p devcontainer.Project
 function M.open_beside(p)
-  M.open(container_spec(p, "shell:" .. p.root), { focus = false })
+  open_container(p, "shell:" .. p.root, { focus = false })
 end
 
 --- ペインのターミナルを順に切り替える

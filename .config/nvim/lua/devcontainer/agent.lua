@@ -218,12 +218,10 @@ function M.open(p)
           end
           claude.copy_git_identity(p, M.user, function()
             local _, created = require("devcontainer.terminal").open({
-              cmd = {
-                "docker", "exec", "-it", "-w", p.root, "-u", M.user,
-                "-e", "CLAUDE_CONFIG_DIR=" .. M.config_dir(p),
-                "-e", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
-                p.container_id, tools.prefix(p) .. "/npm/bin/claude", "--dangerously-skip-permissions",
-              },
+              cmd = require("devcontainer.terminal").exec_cmd(p, M.user, {
+                "CLAUDE_CONFIG_DIR=" .. M.config_dir(p),
+                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
+              }, { claude.bin(p), "--dangerously-skip-permissions" }),
               cwd = p.root,
               name = "agent",
               key = "agent:" .. p.root,
