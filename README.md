@@ -26,10 +26,18 @@ cd ~/dotfiles
 
 ## templates/
 
-新規プロジェクト作成時、`.devcontainer/` の雛形として使う。
+新しいプロジェクトの `.devcontainer/` の雛形。言語を含まない汎用の土台で、どのプロジェクトでも同じ環境（Debian・git・mise・root 以外のユーザー `dev`）になる。Neovim・Zed・VS Code のどれで開いても動く。
+
+Neovim なら、プロジェクトで `:DevcontainerInit` を実行する（`name` を埋めて書き出し、起動するか確認する）。手でコピーするなら:
 
 ```sh
-cp -r ~/dotfiles/templates/devcontainer-node .devcontainer
+cp -R ~/dotfiles/templates/devcontainer .devcontainer
 ```
 
-コピー後、プロジェクトに合わせて `name` や `forwardPorts` 等をカスタマイズする。
+コピーしたあと、`devcontainer.json` の `__NAME__` をプロジェクト名にする。
+
+- 言語やツールは、プロジェクトの `mise.toml` に書く。コンテナを作るときに `post-create.sh` が `mise install` で入れる（手元と同じバージョンになる）
+- 依存のインストールなど、プロジェクトの準備は `post-create.sh` の末尾に足す
+- 開発サーバーを手元のブラウザで開くなら、`devcontainer.json` の `appPort` を有効にする
+- `.git/hooks` などを読み取り専用にする保護と、エージェントの通信制限は、Neovim から開いたときだけ効く（`docs/devcontainer-nvim.md`）
+

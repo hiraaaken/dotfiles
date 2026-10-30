@@ -210,6 +210,45 @@ local function detect(buf)
   if root then vim.schedule(function() handle_root(root) end) end
 end
 
+--- dotfiles の devcontainer の雛形（Neovim の設定は dotfiles へのシンボリックリンク）
+local function template_dir()
+  local config = vim.uv.fs_realpath(vim.fn.stdpath("config"))
+  return config and vim.fs.normalize(config .. "/../../templates/devcontainer")
+end
+
+--- カレントディレクトリのプロジェクト（git ルート）に、雛形から .devcontainer を作る
+local function init_project()
+  local src = template_dir()
+  if not src or not vim.uv.fs_stat(src .. "/devcontainer.json") then
+    return notify("devcontainer の雛形が見つかりません: " .. tostring(src), vim.log.levels.ERROR)
+  end
+  local cwd = vim.fn.getcwd()
+  local root = vim.fs.root(cwd, ".git") or cwd
+  local dest = root .. "/.devcontainer"
+  if vim.uv.fs_stat(dest) or vim.uv.fs_stat(root .. "/.devcontainer.json") then
+    return notify(("%s には既に devcontainer の設定があります"):format(root), vim.log.levels.WARN)
+  end
+  vim.fn.mkdir(dest, "p")
+  for file, type in vim.fs.dir(src) do
+    if type == "file" then
+      local f = assert(io.open(src .. "/" .. file, "rb"))
+      local content = f:read("*a")
+      f:close()
+      if file == "devcontainer.json" then
+        content = content:gsub("__NAME__", (vim.fs.basename(root):gsub("[\\\"%%]", "")))
+      end
+      local out = assert(io.open(dest .. "/" .. file, "wb"))
+      out:write(content)
+      out:close()
+      if file:match("%.sh$") then vim.uv.fs_chmod(dest .. "/" .. file, tonumber("755", 8)) end
+    end
+  end
+  notify(("%s に .devcontainer を作りました"):format(root))
+  -- 起動するかの確認（C5）に回す
+  asked[root] = nil
+  handle_root(root)
+end
+
 --- コマンドの対象プロジェクト（カレントバッファ → カレントディレクトリの順で探す）
 local function current()
   local p = project.for_buf(0)
@@ -313,6 +352,7 @@ function M.setup()
       if p then fn(p) end
     end, {})
   end
+  vim.api.nvim_create_user_command("DevcontainerInit", init_project, { desc = "雛形から .devcontainer を作る" })
 end
 
 return M

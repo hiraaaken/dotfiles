@@ -117,7 +117,8 @@ function M.config_hash(root)
   local dir = root .. "/.devcontainer"
   if vim.uv.fs_stat(dir) then
     for name, type in vim.fs.dir(dir, { depth = 3 }) do
-      if type == "file" then
+      -- .local は起動のたびに手元で書き出すもの（雛形の git の名前など）なので含めない
+      if type == "file" and not vim.startswith(name, ".local/") then
         local f = io.open(dir .. "/" .. name, "r")
         if f then
           table.insert(parts, name .. "\0" .. f:read("*a"))

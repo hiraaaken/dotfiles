@@ -1,0 +1,17 @@
+{
+  "name": "__NAME__",
+  "build": { "dockerfile": "Dockerfile" },
+  "remoteUser": "dev",
+  // 開発サーバーを手元のブラウザで開くときは、ポートを足す
+  // （devcontainer CLI は forwardPorts を扱わないので appPort。VS Code / Zed でも使える）
+  // "appPort": [5173],
+  // git の名前とメールだけを手元から持ち込む（commit 用）。~/.gitconfig ごとマウントすると、
+  // core.editor など手元にしか無いものまで入ってしまう。書き出したものは post-create.sh で設定する
+  "initializeCommand": "mkdir -p \"${localWorkspaceFolder}/.devcontainer/.local\" && { git -C \"${localWorkspaceFolder}\" config user.name; git -C \"${localWorkspaceFolder}\" config user.email; } > \"${localWorkspaceFolder}/.devcontainer/.local/git-identity\" || true",
+  // Zed は postCreateCommand の引数を落とすことがあるので、引数なしで呼べるスクリプトにする
+  "postCreateCommand": ".devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": { "extensions": [] },
+    "zed": { "extensions": [] }
+  }
+}
