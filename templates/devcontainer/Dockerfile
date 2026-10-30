@@ -31,6 +31,10 @@ ENV LANG=C.UTF-8 \
     EDITOR=vi \
     MISE_YES=1 \
     MISE_DATA_DIR=/home/${USERNAME}/.local/share/mise \
+    # pnpm のストアをコンテナの中に置く（ホームとプロジェクトのファイルシステムが違うと、
+    # pnpm はプロジェクトのマウントの一番上に .pnpm-store を作り、手元に置かれてしまう）
+    pnpm_config_store_dir=/home/${USERNAME}/.local/share/pnpm/store \
+    npm_config_store_dir=/home/${USERNAME}/.local/share/pnpm/store \
     PATH=/home/${USERNAME}/.local/share/mise/shims:${PATH}
 
 USER ${USERNAME}
