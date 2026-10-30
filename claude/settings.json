@@ -1,0 +1,23 @@
+{
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "svelte@svelte": true
+  },
+  "extraKnownMarketplaces": {
+    "svelte": {
+      "source": {
+        "source": "github",
+        "repo": "sveltejs/ai-tools"
+      }
+    }
+  },
+  "language": "japanese",
+  "advisorModel": "opus",
+  "tui": "fullscreen",
+  "theme": "dark-ansi",
+  "agentPushNotifEnabled": true
+}

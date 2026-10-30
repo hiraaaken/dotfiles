@@ -1,0 +1,45 @@
+# コンテナのシェル（bash）の rcfile。terminal.lua が開くたびにコンテナの一時ディレクトリへ書き出す。
+# 共有のボリュームに置くと、あるプロジェクトのコンテナから他のプロジェクトのシェルで動くコードを仕込めるので置かない。
+# NVIM_DC_ROOT: プロジェクトのルート、NVIM_DC_DIR: この一時ディレクトリ（claude へのリンクを置く）
+
+# ログインシェルと同じ設定を読む（--rcfile で開くと読まれないため）
+[ -f /etc/profile ] && . /etc/profile
+for f in ~/.bash_profile ~/.bash_login ~/.profile; do
+  if [ -f "$f" ]; then . "$f"; break; fi
+done
+[ -f "$f" ] || { [ -f ~/.bashrc ] && . ~/.bashrc; }
+unset f
+
+# profile が PATH を書き換えることがあるので、読んだあとに足す
+PATH="$NVIM_DC_ROOT/node_modules/.bin:$PATH:$NVIM_DC_DIR"
+trap 'rm -rf "$NVIM_DC_DIR"' EXIT
+
+alias ls='ls --color=auto' ll='ls -lAh --color=auto' grep='grep --color=auto'
+
+__nvim_dc_name=${NVIM_DC_ROOT##*/}
+command -v git >/dev/null && __nvim_dc_git=1
+
+# プロンプトに出すもの。値は PS1 に直接埋め込まず、変数で参照する（パスの \ や $ が展開されないように）
+__nvim_dc_prompt() {
+  # 直前のコマンドが失敗したら ❯ を赤にする
+  if [ $? -eq 0 ]; then __nvim_dc_color=32; else __nvim_dc_color=31; fi
+  case $PWD in
+    "$NVIM_DC_ROOT" | "$NVIM_DC_ROOT"/*) __nvim_dc_pwd=$__nvim_dc_name${PWD#"$NVIM_DC_ROOT"} ;;
+    "$HOME" | "$HOME"/*) __nvim_dc_pwd="~${PWD#"$HOME"}" ;;
+    *) __nvim_dc_pwd=$PWD ;;
+  esac
+  # 作業ツリーの変更は見ない（バインドマウントは遅く、毎回のプロンプトで走るため）
+  __nvim_dc_branch=
+  if [ -n "$__nvim_dc_git" ]; then
+    __nvim_dc_branch=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short -q HEAD 2>/dev/null)
+  fi
+  __nvim_dc_branch=${__nvim_dc_branch:+  $__nvim_dc_branch}
+}
+PROMPT_COMMAND="__nvim_dc_prompt${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+
+# ⬢ はコンテナの中であることの印。root のときは名前を赤で出す
+__nvim_dc_user=
+[ "$(id -u)" -eq 0 ] && __nvim_dc_user='\[\e[1;31m\]root\[\e[0m\] '
+PS1="\n\[\e[36m\]⬢\[\e[0m\] $__nvim_dc_user"'\[\e[1;34m\]${__nvim_dc_pwd}\[\e[0m\]\[\e[35m\]${__nvim_dc_branch}\[\e[0m\]\n'
+PS1+='\[\e[${__nvim_dc_color}m\]❯\[\e[0m\] '
+unset __nvim_dc_user

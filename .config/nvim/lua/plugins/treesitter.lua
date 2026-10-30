@@ -15,6 +15,7 @@ return {
       "yaml",
       "html",
       "css",
+      "vue",
       "markdown",
       "markdown_inline",
       "bash",
@@ -23,6 +24,7 @@ return {
       "vimdoc",
       "haskell",
       "kotlin",
+      "elm",
     })
 
     vim.api.nvim_create_autocmd("FileType", {

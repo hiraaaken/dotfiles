@@ -1,42 +1,81 @@
+// Zed keymap — ~/.config/nvim/lua/core/keymaps.lua からの移植
+//
+// リーダーキーは nvim と同じくスペース。
+// Zed の Vim mode は nvim のエミュレーションではないので、
+// 移植できなかったものはファイル末尾にコメントで理由付きで残してある。
 [
-  // jj で Insert -> Normal (core/keymaps.lua: keymap.set("i", "jj", "<ESC>"))
+  // ── insert mode ──────────────────────────────────────────────
   {
-    "context": "vim_mode == insert",
+    "context": "vim_mode == insert && !menu",
     "bindings": {
+      // jj で normal に戻る
       "j j": "vim::NormalBefore"
     }
   },
+
+  // ── normal / visual 共通 ─────────────────────────────────────
+  {
+    "context": "VimControl && !menu",
+    "bindings": {
+      // <leader>h / <leader>l で行頭 / 行末
+      "space h": "vim::FirstNonWhitespace",
+      "space l": "vim::EndOfLine"
+    }
+  },
+
+  // ── normal mode ──────────────────────────────────────────────
   {
     "context": "vim_mode == normal && !menu",
     "bindings": {
-      // window management (<leader>sv/sh/se/sx)
-      "space s v": "pane::SplitRight",
-      "space s h": "pane::SplitDown",
-      "space s e": "vim::ResetPaneSizes",
-      "space s x": "pane::CloseActiveItem",
-
-      // window move (<C-h/j/k/l>)
+      // ウィンドウ（ペイン）移動 — nvim の <C-w>h/j/k/l 相当
       "ctrl-h": "workspace::ActivatePaneLeft",
       "ctrl-j": "workspace::ActivatePaneDown",
       "ctrl-k": "workspace::ActivatePaneUp",
       "ctrl-l": "workspace::ActivatePaneRight",
 
-      // buffer move (H/L -> previous/next tab)
+      // バッファ（タブ）移動
       "shift-h": "pane::ActivatePreviousItem",
       "shift-l": "pane::ActivateNextItem",
 
-      // write / close (<leader>w, <leader>q, <leader>Q)
+      // ウィンドウ分割
+      "space s v": "pane::SplitRight",
+      "space s h": "pane::SplitDown",
+      // <leader>sx（分割を閉じる）。Zed ではペイン内の最後のアイテムを
+      // 閉じるとペイン自体が畳まれるので、これで実質同じ挙動になる
+      "space s x": "pane::CloseActiveItem",
+
+      // 保存 / 閉じる
       "space w": "workspace::Save",
       "space q": "pane::CloseActiveItem",
       "space shift-q": "workspace::CloseWindow"
     }
-  },
-  {
-    "context": "VimControl && !menu",
-    "bindings": {
-      // cursor move (<leader>h/l -> ^ / $) in normal & visual
-      "space h": ["workspace::SendKeystrokes", "^"],
-      "space l": ["workspace::SendKeystrokes", "$"]
-    }
   }
+
+  // ── 移植しなかったもの ───────────────────────────────────────
+  //
+  // <leader>se（分割を均等サイズに）
+  //   Zed にペインを均等化するアクションが無い（ドックのサイズ変更のみ）。
+  //
+  // p → p`] / P → P`]（ペースト後に末尾へ移動）
+  // x → "_x / visual の x → "_d（レジスタを汚さない削除）
+  // visual の p / P 入れ替え（レジスタを変えずにペースト）
+  //   Zed の Vim mode でのマーク `] やブラックホールレジスタの挙動が
+  //   nvim と同じか未確認。試すなら workspace::SendKeystrokes で書ける:
+  //     "p": ["workspace::SendKeystrokes", "p ` ]"]
+  //     "x": ["workspace::SendKeystrokes", "\" _ x"]
+  //   期待通りに動かないと p や x という頻用キーが壊れるので、
+  //   まず素の挙動を確認してから入れることを勧める。
+  //
+  // <leader>;（@: で直前の Ex コマンドを再実行）
+  //   Zed にコマンド履歴のレジスタ @: が無い。
+  //
+  // so（:source）
+  //   Zed は設定ファイルを保存時に自動で反映するため不要。
+  //
+  // コマンドライン履歴の <C-n> / <C-p>
+  //   Zed のコマンドパレットは上下キーで選択する。wildmenu 相当が無い。
+  //
+  // <leader>q の「変更があれば確認 → バッファ削除 → 空ならダッシュボード」
+  //   Zed のキーマップは単一アクションか配列しか書けず、Lua のような条件分岐は不可。
+  //   pane::CloseActiveItem で代替（未保存なら Zed が確認ダイアログを出す）。
 ]

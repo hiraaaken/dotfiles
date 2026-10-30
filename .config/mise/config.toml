@@ -1,0 +1,6 @@
+[tools]
+aube = "latest"
+node = "26"
+"npm:@devcontainers/cli" = "latest"
+elm = "0.19.1"
+"npm:elm-format" = "latest"

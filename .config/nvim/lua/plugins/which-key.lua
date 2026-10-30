@@ -5,7 +5,11 @@ return {
     vim.o.timeout = true
     vim.o.timeoutlen = 500
   end,
-  opts = {},
+  opts = {
+    spec = {
+      { "<leader>t", group = "terminal" },
+    },
+  },
   keys = {
     {
       "<leader>?",

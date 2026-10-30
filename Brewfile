@@ -19,6 +19,7 @@ brew "ghq"
 brew "lazygit"
 brew "uv"
 brew "mise"
+brew "usage" # mise の補完に使う
 brew "bat"
 brew "tree-sitter"
 brew "tree-sitter-cli"
@@ -33,10 +34,19 @@ brew "turso"
 brew "colima"
 brew "docker"
 brew "docker-compose"
+brew "docker-buildx"
 
 # Neovim IME support
 tap "daipeihust/tap"
 brew "im-select"
 
-# Editor
+# Editor / Terminal
 cask "zed"
+cask "visual-studio-code" # .gitconfig の core.editor
+cask "ghostty"
+
+# Apps
+cask "copilot-cli"
+
+# Fonts
+cask "font-hack-nerd-font"
