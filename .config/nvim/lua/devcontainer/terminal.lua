@@ -294,20 +294,99 @@ function M.open_beside(p)
   open_container(p, "shell:" .. p.root, { focus = false })
 end
 
+--- 操作の対象にするペインのウィンドウ（ペインにいればそこ、エディタからなら最初のもの）
+---@return integer?
+local function target_win()
+  local cur = vim.api.nvim_get_current_win()
+  if is_pane(cur) then return cur end
+  return pane_wins()[1]
+end
+
 --- ペインのターミナルを順に切り替える
 ---@param step integer
 function M.cycle(step)
+  local win = target_win()
+  if not win then return end
   local list = terms()
-  local cur = vim.api.nvim_get_current_buf()
-  local i = vim.fn.index(list, cur)
+  local i = vim.fn.index(list, vim.api.nvim_win_get_buf(win))
   if i < 0 or #list < 2 then return end
-  vim.api.nvim_win_set_buf(0, list[(i + step) % #list + 1])
+  vim.api.nvim_win_set_buf(win, list[(i + step) % #list + 1])
+  if win == vim.api.nvim_get_current_win() then enter(win) end
+end
+
+--- ペインの幅を変える。変えた幅は、次にペインを開くときにも使う
+---@param delta integer 正なら広げる
+function M.resize_width(delta)
+  local win = target_win()
+  if not win then return end
+  local width = math.max(20, math.min(vim.o.columns - 20, vim.api.nvim_win_get_width(win) + delta))
+  vim.api.nvim_win_set_width(win, width)
+  M.width = width / vim.o.columns
+  vim.t.devcontainer_zoom = nil
+end
+
+--- ペインを上下に分割しているとき、いまのターミナルの高さを変える
+---@param delta integer
+function M.resize_height(delta)
+  local win = target_win()
+  -- 分割していないと画面の高さいっぱいなので、変えるとコマンドラインの高さが変わってしまう
+  if not win or #pane_wins() < 2 then return end
+  vim.api.nvim_win_set_height(win, vim.api.nvim_win_get_height(win) + delta)
+end
+
+--- ペインの幅を既定に戻し、上下に分割したターミナルの高さをそろえる
+function M.reset_size()
+  M.width = 0.4
+  vim.t.devcontainer_zoom = nil
+  local wins = pane_wins()
+  for _, win in ipairs(wins) do
+    vim.api.nvim_win_set_width(win, math.floor(vim.o.columns * M.width))
+  end
+  if #wins < 2 then return end
+  local total = 0
+  for _, win in ipairs(wins) do total = total + vim.api.nvim_win_get_height(win) end
+  for _, win in ipairs(wins) do vim.api.nvim_win_set_height(win, math.floor(total / #wins)) end
+end
+
+--- ペインを画面いっぱいに広げる / 元の幅に戻す
+function M.zoom()
+  local win = target_win()
+  if not win then return end
+  if vim.t.devcontainer_zoom then
+    vim.api.nvim_win_set_width(win, vim.t.devcontainer_zoom)
+    vim.t.devcontainer_zoom = nil
+  else
+    vim.t.devcontainer_zoom = vim.api.nvim_win_get_width(win)
+    vim.api.nvim_win_set_width(win, vim.o.columns)
+  end
+end
+
+--- サイズ変更モード。h/l で幅、j/k で高さを続けて変えられる。それ以外のキーで抜ける
+function M.resize_mode()
+  local actions = {
+    h = function() M.resize_width(5) end,
+    l = function() M.resize_width(-5) end,
+    k = function() M.resize_height(2) end,
+    j = function() M.resize_height(-2) end,
+    ["="] = M.reset_size,
+    z = M.zoom,
+  }
+  while true do
+    vim.cmd.redraw()
+    vim.api.nvim_echo({ { "ターミナルのサイズ: h/l 幅  j/k 高さ  = 戻す  z 最大化  (他のキーで終了)", "ModeMsg" } }, false, {})
+    local ok, key = pcall(vim.fn.getcharstr)
+    local action = ok and actions[key]
+    if not action then break end
+    action()
+  end
+  vim.api.nvim_echo({ { "" } }, false, {})
 end
 
 --- いまのターミナルを閉じる（シェルも終わらせる）
 function M.close()
-  local buf = vim.api.nvim_get_current_buf()
-  if vim.b[buf].devcontainer_term == nil then return end
+  local win = target_win()
+  if not win then return end
+  local buf = vim.api.nvim_win_get_buf(win)
   if alive(buf) then vim.fn.jobstop(vim.b[buf].terminal_job_id) end
   remove(buf)
 end
@@ -366,8 +445,14 @@ function M.setup()
   map("n", "<leader>tx", M.close, { desc = "Close terminal" })
   map("n", "<leader>th", M.host, { desc = "Terminal (host)" })
   map("n", "<leader>tc", function() M.container() end, { desc = "Terminal (container)" })
+  map("n", "<leader>t]", function() M.cycle(1) end, { desc = "Next terminal" })
+  map("n", "<leader>t[", function() M.cycle(-1) end, { desc = "Prev terminal" })
+  map("n", "<leader>tr", M.resize_mode, { desc = "Resize terminals" })
+  map("n", "<leader>tz", M.zoom, { desc = "Zoom terminals" })
+  map("n", "<leader>t=", M.reset_size, { desc = "Reset terminal size" })
 
-  -- ターミナルのバッファの中だけで使うキー
+  -- ターミナルのバッファの中だけで使うキー。ターミナルモードでは、シェルや Claude のキーとぶつからないよう
+  -- <C-\>（Neovim が <C-\><C-n> 用に使い、シェルには送らない）を前置きにする
   vim.api.nvim_create_autocmd("TermOpen", {
     group = vim.api.nvim_create_augroup("devcontainer.terminal", {}),
     callback = function(ev)
@@ -378,6 +463,18 @@ function M.setup()
       bmap("t", "<C-/>", M.leave, "Back to editor")
       bmap("t", "<C-_>", M.leave, "which_key_ignore")
       bmap("t", "<Esc><Esc>", "<C-\\><C-n>", "Terminal normal mode")
+      bmap("t", "<C-\\>n", function() M.new() end, "New terminal")
+      bmap("t", "<C-\\>s", function() M.new({ new_window = true }) end, "New terminal (split)")
+      bmap("t", "<C-\\>x", M.close, "Close terminal")
+      bmap("t", "<C-\\>q", M.hide, "Hide terminals")
+      bmap("t", "<C-\\>]", function() M.cycle(1) end, "Next terminal")
+      bmap("t", "<C-\\>[", function() M.cycle(-1) end, "Prev terminal")
+      bmap("t", "<C-\\>r", M.resize_mode, "Resize terminals")
+      bmap("t", "<C-\\>z", M.zoom, "Zoom terminals")
+      bmap("t", "<C-\\>=", M.reset_size, "Reset terminal size")
+      for _, dir in ipairs({ "h", "j", "k", "l" }) do
+        bmap("t", "<C-\\>" .. dir, "<Cmd>wincmd " .. dir .. "<CR>", "Move to window " .. dir)
+      end
       bmap("n", "]t", function() M.cycle(1) end, "Next terminal")
       bmap("n", "[t", function() M.cycle(-1) end, "Prev terminal")
       bmap("n", "q", M.hide, "Hide terminals")
